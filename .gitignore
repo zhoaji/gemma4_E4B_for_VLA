@@ -1,0 +1,35 @@
+# Secrets & Configuration
+config.env
+*.env
+!.env.example
+!config.env.example
+
+# Large Data & Model Weights
+data/
+*.gguf
+*.bin
+*.safetensors
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.h5
+
+# Logs & Runtime
+logs/
+*.log
+
+# Python / Environments
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+build/
+dist/
+
+# OS / Editor Files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
