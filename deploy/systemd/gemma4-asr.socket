@@ -1,0 +1,10 @@
+[Unit]
+Description=Gemma4 on-demand ASR socket
+
+[Socket]
+ListenStream=8000
+BindIPv6Only=both
+NoDelay=true
+
+[Install]
+WantedBy=sockets.target

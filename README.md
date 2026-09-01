@@ -111,6 +111,73 @@ sudo docker ps --filter name=gemma4-llama
 ./scripts/start-llama.sh
 ```
 
+## 局域网 UI、按需监控与模型代理（8001）
+
+局域网设备统一访问 `http://<Jetson-IP>:8001/`。该地址由 systemd 的
+`gemma4-system-monitor.socket` 持续监听；它本身仅约 8KB，不运行 Python 或
+`tegrastats`。首次访问会自动唤醒 `gemma4-system-monitor.service`，无需手动启动。
+
+服务实现位于 `app/brain/monitor/server.py`，只使用 Python 标准库：
+
+| 路径 | 用途 |
+| --- | --- |
+| `/` | 提供 `app/ui/Mulitiple_model_UI.html` 主界面。 |
+| `/api/system/stats` | 返回 CPU、GPU 利用率、系统 RAM、GPU/CPU 温度与设备信息。 |
+| `/health`、`/v1/models`、`/v1/chat/completions` | 仅转发到本机 `127.0.0.1:8080` 的 llama.cpp 模型；回答的 SSE 数据会逐块透传。 |
+| `/api/monitor/health` | 监控服务自身的健康检查。 |
+
+UI 从 8001 打开时会自动将模型地址改为同源 8001，由后端代理到仅本机监听的
+8080。因此模型端口无需暴露到局域网。状态栏每 3 秒请求一次；最后一次 UI 请求后
+90 秒，监控 Python 进程与 `tegrastats` 自动退出。下次请求仍由 socket 自动唤醒。
+
+Jetson 使用统一内存，无法准确提供独立 VRAM；状态栏对应位置改为 GPU / CPU 温度，
+单位为 `℃`。刚打开页面的前 2–3 秒等待 `tegrastats` 首次采样时可能显示 `--`。
+
+查看与排障：
+
+```bash
+sudo systemctl status gemma4-system-monitor.socket gemma4-system-monitor.service
+curl http://127.0.0.1:8001/api/system/stats
+sudo journalctl -u gemma4-system-monitor.service -n 100 --no-pager
+```
+
+若后续加入灯光、相机或动作控制，请扩展该 8001 边缘服务，不要另起服务占用 8001。
+8001 当前没有认证，仅应开放在可信局域网；不可信网络应配置防火墙或增加认证。
+
+## 语音输入（Whisper ASR）
+
+UI 的“点击开始说话”会录制完整语音，停止后转换为 16 kHz WAV 并上传；完整上下文可避免
+短片段造成的漏字、重复和语义误判，识别文本会在完成后填入文字输入框。8001/8443 将请求
+代理到仅本机监听的 8000 ASR 服务。
+
+默认使用已下载的多语言 Whisper `base`，以完整音频提高普通话与中英混说的准确率；语言由
+模型自动检测，不会把英文强制识别成中文。结果通过 OpenCC `tw2sp` 词典统一转换为大陆简体中文。
+CUDA whisper.cpp 后端完成时会优先使用，尚未就绪时自动回退到 `base` CPU。180 秒没有 ASR
+请求即关闭服务并释放占用。模型与 CUDA 服务可通过 `scripts/install-asr.sh` 重建。
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl restart gemma4-asr.service
+```
+
+远程浏览器的麦克风必须使用安全上下文。局域网语音输入请访问：
+
+```text
+https://<Jetson-IP>:8443/
+```
+
+8443 使用项目生成的自签名证书，首次访问需在浏览器中确认信任；HTTP 8001 仍可用于
+状态查看和文字/图片对话，但多数浏览器会拒绝其麦克风权限。证书创建脚本为
+`scripts/create-ui-certificate.sh`，ASR 安装脚本为 `scripts/install-asr.sh`。
+
+排障：
+
+```bash
+sudo systemctl status gemma4-asr.socket gemma4-asr.service
+curl -k https://127.0.0.1:8443/api/monitor/health
+sudo journalctl -u gemma4-asr.service -n 100 --no-pager
+```
+
 ## 资源与排障
 
 不要同时运行 vLLM、其他大型模型或多个 E4B 容器。需要重新尝试加载时：

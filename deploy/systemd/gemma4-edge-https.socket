@@ -1,0 +1,10 @@
+[Unit]
+Description=Gemma4 on-demand HTTPS edge socket
+
+[Socket]
+ListenStream=8443
+BindIPv6Only=both
+NoDelay=true
+
+[Install]
+WantedBy=sockets.target

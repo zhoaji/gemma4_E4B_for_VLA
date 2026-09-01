@@ -151,6 +151,129 @@
             box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2), inset 1px 1px 1px rgba(255, 255, 255, 0.4);
         }
 
+        /* 本机状态：沿用页面的液态玻璃层次，不依赖特定后端实现 */
+        .panel-system-stats {
+            /* 左侧 20 + TTS 外宽约 290，预留 20px 间距，避免与语音面板重叠 */
+            top: 90px;
+            left: 330px;
+            right: 20px;
+            width: auto;
+            padding: 18px 20px 20px;
+            gap: 18px;
+        }
+
+        .system-stats-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            font-weight: 700;
+            letter-spacing: .4px;
+        }
+
+        .system-stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 14px;
+        }
+
+        .system-stat-card {
+            min-width: 0;
+            padding: 15px 16px;
+            border: 1px solid rgba(255, 255, 255, .15);
+            border-radius: 14px;
+            background: rgba(0, 0, 0, .18);
+            box-shadow: inset 0 1px 1px rgba(255, 255, 255, .06);
+        }
+
+        .system-stat-card-header {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 13px;
+        }
+
+        .system-stat-card-label {
+            color: rgba(255, 255, 255, .76);
+            font-size: 11px;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        .system-stat-card-value {
+            color: #fff;
+            font-size: 15px;
+            font-weight: 700;
+            text-align: right;
+            white-space: nowrap;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .temperature-card .system-stat-card-header {
+            display: block;
+            margin-bottom: 10px;
+        }
+
+        .temperature-card .system-stat-card-value {
+            display: block;
+            margin-top: 5px;
+            text-align: left;
+            font-size: 13px;
+        }
+
+        .service-state {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            color: rgba(255, 255, 255, .72);
+            font-size: 10px;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+
+        .service-state::before {
+            content: '';
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #ff9f0a;
+            box-shadow: 0 0 10px rgba(255, 159, 10, .75);
+        }
+
+        .service-state.online::before {
+            background: #34c759;
+            box-shadow: 0 0 10px rgba(52, 199, 89, .75);
+        }
+
+        .service-state.offline::before {
+            background: #ff453a;
+            box-shadow: 0 0 10px rgba(255, 69, 58, .7);
+        }
+
+        .stat-track {
+            height: 5px;
+            border-radius: 999px;
+            overflow: hidden;
+            background: rgba(0, 0, 0, .28);
+            box-shadow: inset 0 1px 2px rgba(0, 0, 0, .25);
+        }
+
+        .stat-bar {
+            width: 0%;
+            height: 100%;
+            border-radius: inherit;
+            background: linear-gradient(90deg, #5ac8fa, #0a84ff);
+            transition: width .35s ease, background .2s ease;
+        }
+
+        .system-stats-note {
+            color: rgba(255, 255, 255, .5);
+            font-size: 11px;
+            line-height: 1.35;
+        }
+
         /* === 悬浮面板 (UI 层级设为 10) === */
         .floating-panel {
             position: absolute;
@@ -520,6 +643,18 @@
             .panel-controls {
                 margin-top: 80vh;
             }
+
+            .panel-system-stats {
+                margin-top: 0;
+            }
+
+            .system-stats-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 520px) {
+            .system-stats-grid { grid-template-columns: 1fr; }
         }
 
         /* 设置模态框 */
@@ -688,7 +823,8 @@
 
         /* === 新增按钮样式 === */
         #recordButton,
-        #sendButton {
+        #sendButton,
+        #imageUploadButton {
             flex: 1;
             padding: 12px;
             border-radius: 20px;
@@ -710,8 +846,13 @@
             background: linear-gradient(180deg, #0a84ff 0%, #0062cc 100%);
         }
 
+        #imageUploadButton {
+            background: linear-gradient(180deg, #bf5af2 0%, #8944ab 100%);
+        }
+
         #recordButton:hover,
-        #sendButton:hover {
+        #sendButton:hover,
+        #imageUploadButton:hover {
             transform: translateY(-2px) scale(1.02);
             box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
         }
@@ -769,6 +910,35 @@
 
         <div class="app-title">Vision Spatial Pro</div>
 
+        <!-- 本机状态：模型健康检查可直接使用，详细硬件指标由控制器提供 -->
+        <section class="floating-panel panel-system-stats" aria-label="本机系统状态">
+            <div class="system-stats-header">
+                <span>Local System Stats</span>
+                <span style="display:flex;align-items:center;gap:12px;">
+                    <span id="systemStatsNote" class="system-stats-note">Loading…</span>
+                    <span id="modelServiceState" class="service-state">检测模型中</span>
+                </span>
+            </div>
+            <div class="system-stats-grid">
+                <div class="system-stat-card">
+                    <div class="system-stat-card-header"><span class="system-stat-card-label">GPU Utilization</span><span id="gpuUtilValue" class="system-stat-card-value">--%</span></div>
+                    <span class="stat-track"><span id="gpuUtilBar" class="stat-bar"></span></span>
+                </div>
+                <div class="system-stat-card temperature-card">
+                    <div class="system-stat-card-header"><span class="system-stat-card-label">GPU / CPU Temperature</span><span id="temperatureValue" class="system-stat-card-value">-- ℃</span></div>
+                    <span class="stat-track"><span id="temperatureBar" class="stat-bar"></span></span>
+                </div>
+                <div class="system-stat-card">
+                    <div class="system-stat-card-header"><span class="system-stat-card-label">CPU Utilization</span><span id="cpuUtilValue" class="system-stat-card-value">--%</span></div>
+                    <span class="stat-track"><span id="cpuUtilBar" class="stat-bar"></span></span>
+                </div>
+                <div class="system-stat-card">
+                    <div class="system-stat-card-header"><span class="system-stat-card-label">System RAM</span><span id="ramUsageValue" class="system-stat-card-value">-- GB</span></div>
+                    <span class="stat-track"><span id="ramUsageBar" class="stat-bar"></span></span>
+                </div>
+            </div>
+        </section>
+
         <!-- 右上角控制条 -->
         <div class="floating-panel panel-controls">
             <div style="display:flex; flex-direction:column; min-width: 90px; margin-right:10px;">
@@ -811,6 +981,22 @@
                             <div class="settings-group">
                                 <label for="baseURL">VLM API (Vision)</label>
                                 <input id="baseURL">
+                            </div>
+
+                            <div class="settings-group">
+                                <label for="localModelName">本地模型名称</label>
+                                <input id="localModelName" value="gemma-4-E4B-it" placeholder="启动时自动检测">
+                            </div>
+
+                            <div class="settings-group">
+                                <label for="systemStatsURL">System Stats API（可选）</label>
+                                <input id="systemStatsURL" placeholder="http://127.0.0.1:8001/api/system/stats">
+                                <div style="font-size:10px;color:rgba(255,255,255,.48);margin-top:5px;line-height:1.35;">控制器返回 GPU / CPU / RAM JSON 后，状态卡每 3 秒自动更新。</div>
+                            </div>
+
+                            <div style="display:flex;align-items:center;justify-content:space-between;margin:10px 0 14px;">
+                                <span style="font-size:12px;color:rgba(255,255,255,.72);">🧠 显示模型思考过程</span>
+                                <input type="checkbox" id="thinkingMode" style="width:16px;height:16px;cursor:pointer;">
                             </div>
 
                             <div class="settings-group">
@@ -926,6 +1112,8 @@
             </div>
 
             <div style="display: flex; gap: 10px; margin-top: 12px;">
+                <input id="imageUpload" type="file" accept="image/*" hidden>
+                <button id="imageUploadButton" type="button" title="选择图片" style="flex:0 0 48px;">🖼️</button>
                 <button id="recordButton">
                     🎙️ 按住说话
                 </button>
@@ -1044,6 +1232,21 @@
         const recordButton = document.getElementById('recordButton');
         const sendButton = document.getElementById('sendButton');
         const controllerURL = document.getElementById('controllerURL');
+        const localModelName = document.getElementById('localModelName');
+        const systemStatsURL = document.getElementById('systemStatsURL');
+        const thinkingMode = document.getElementById('thinkingMode');
+        const imageUpload = document.getElementById('imageUpload');
+        const imageUploadButton = document.getElementById('imageUploadButton');
+        const modelServiceState = document.getElementById('modelServiceState');
+        const systemStatsNote = document.getElementById('systemStatsNote');
+        const gpuUtilBar = document.getElementById('gpuUtilBar');
+        const gpuUtilValue = document.getElementById('gpuUtilValue');
+        const temperatureBar = document.getElementById('temperatureBar');
+        const temperatureValue = document.getElementById('temperatureValue');
+        const ramUsageBar = document.getElementById('ramUsageBar');
+        const ramUsageValue = document.getElementById('ramUsageValue');
+        const cpuUtilBar = document.getElementById('cpuUtilBar');
+        const cpuUtilValue = document.getElementById('cpuUtilValue');
 
         // TTS 相关元素
         const ttsURL = document.getElementById('ttsURL');
@@ -1071,11 +1274,16 @@
         let stream = null;
         let isProcessing = false;
         let abortController = null;
+        let pendingImageDataUrl = null;
+        let systemStatsTimer = null;
+        let systemStatsAbortController = null;
+        let modelIdDiscovered = false;
 
-        // 录音相关变量
+        // 对话 ASR：完整录音结束后统一识别，避免短片段损失上下文。
+        let isRecordingForChat = false;
         let asrMediaRecorder = null;
         let asrAudioChunks = [];
-        let isRecordingForChat = false;
+        let recordStartTime = 0;
 
         // TTS 录音相关
         let currentTtsAudioBlob = null;
@@ -1088,10 +1296,24 @@
         (function initApiUrls() {
             // 无论从 localhost 还是局域网 IP 访问，都使用当前页面的 host，直接本地打开时使用 127.0.0.1 兜底
             const host = window.location.hostname || "127.0.0.1";
-            baseURL.value = `http://${host}:8080`;
-            asrURL.value = `http://${host}:8000`;
+            // 从 8001 打开时由本机边缘服务代理模型，模型 8080 无需暴露到局域网。
+            const useEdgeProxy = ["8001", "8443"].includes(window.location.port);
+            const edgeOrigin = window.location.origin;
+            baseURL.value = useEdgeProxy ? edgeOrigin : `http://${host}:8080`;
+            asrURL.value = useEdgeProxy ? edgeOrigin : `http://${host}:8000`;
             controllerURL.value = `http://${host}:8001`;
             ttsURL.value = `http://${host}:9881`;
+            systemStatsURL.value = useEdgeProxy ? `${edgeOrigin}/api/system/stats` : `http://${host}:8001/api/system/stats`;
+            try {
+                const saved = JSON.parse(localStorage.getItem('localServiceConfig') || '{}');
+                [baseURL, asrURL, controllerURL, ttsURL, localModelName, systemStatsURL].forEach((input) => {
+                    // 页面由 8001 提供时强制走代理，避免旧缓存把局域网浏览器指向不可访问的 8080。
+                    if (saved[input.id] && !(useEdgeProxy && [baseURL, asrURL, systemStatsURL].includes(input))) input.value = saved[input.id];
+                });
+                thinkingMode.checked = saved.thinkingMode === true;
+            } catch (error) {
+                console.warn('[Config] 本地服务配置读取失败:', error);
+            }
             console.log(`[Config] API host 自动设置为: ${host}`);
         })();
         // ================================================================
@@ -1102,10 +1324,165 @@
 
         settingsBtn.addEventListener('click', toggleSettings);
         closeSettingsBtn.addEventListener('click', toggleSettings);
-        saveSettingsBtn.addEventListener('click', toggleSettings);
+        saveSettingsBtn.addEventListener('click', () => {
+            const config = {};
+            [baseURL, asrURL, controllerURL, ttsURL, localModelName, systemStatsURL].forEach((input) => {
+                config[input.id] = input.value.trim();
+            });
+            config.thinkingMode = thinkingMode.checked;
+            localStorage.setItem('localServiceConfig', JSON.stringify(config));
+            startSystemStats();
+            toggleSettings();
+        });
 
         settingsModal.addEventListener('click', (e) => {
             if (e.target === settingsModal) toggleSettings();
+        });
+
+        function setModelServiceState(label, state = '') {
+            modelServiceState.textContent = label;
+            modelServiceState.className = `service-state ${state}`;
+        }
+
+        function clampPercent(value) {
+            const numeric = Number(value);
+            return Number.isFinite(numeric) ? Math.max(0, Math.min(100, numeric)) : null;
+        }
+
+        function readMetric(data, paths) {
+            for (const path of paths) {
+                const value = path.split('.').reduce((current, key) => current?.[key], data);
+                const numeric = Number(value);
+                if (Number.isFinite(numeric)) return numeric;
+            }
+            return null;
+        }
+
+        function updatePercentStat(bar, valueElement, percent, fallback = '--%') {
+            if (percent === null) {
+                bar.style.width = '0%';
+                valueElement.textContent = fallback;
+                return;
+            }
+            const safePercent = clampPercent(percent);
+            bar.style.width = `${safePercent}%`;
+            bar.style.background = safePercent >= 85
+                ? 'linear-gradient(90deg, #ff9f0a, #ff453a)'
+                : 'linear-gradient(90deg, #5ac8fa, #0a84ff)';
+            valueElement.textContent = `${Math.round(safePercent)}%`;
+        }
+
+        function updateMemoryStat(bar, valueElement, used, total, percent) {
+            const calculatedPercent = percent ?? (used !== null && total > 0 ? used / total * 100 : null);
+            if (used === null || total === null || total <= 0 || calculatedPercent === null) {
+                bar.style.width = '0%';
+                valueElement.textContent = '-- GB';
+                return;
+            }
+            const safePercent = clampPercent(calculatedPercent);
+            bar.style.width = `${safePercent}%`;
+            bar.style.background = safePercent >= 85
+                ? 'linear-gradient(90deg, #ff9f0a, #ff453a)'
+                : 'linear-gradient(90deg, #bf5af2, #0a84ff)';
+            valueElement.textContent = `${used.toFixed(1)}/${total.toFixed(1)} GB`;
+        }
+
+        function updateTemperatureStat(bar, valueElement, gpuTemperature, cpuTemperature) {
+            const values = [gpuTemperature, cpuTemperature].filter(value => value !== null);
+            if (!values.length) {
+                bar.style.width = '0%';
+                valueElement.textContent = '-- ℃';
+                return;
+            }
+            const gpuText = gpuTemperature !== null ? `GPU ${gpuTemperature.toFixed(1)}℃` : 'GPU --℃';
+            const cpuText = cpuTemperature !== null ? `CPU ${cpuTemperature.toFixed(1)}℃` : 'CPU --℃';
+            const hottest = Math.max(...values);
+            const safePercent = Math.min(100, hottest / 90 * 100);
+            bar.style.width = `${safePercent}%`;
+            bar.style.background = hottest >= 80
+                ? 'linear-gradient(90deg, #ff9f0a, #ff453a)'
+                : 'linear-gradient(90deg, #34c759, #5ac8fa)';
+            valueElement.textContent = `${gpuText} · ${cpuText}`;
+        }
+
+        function updateSystemStats(data) {
+            const stats = data.stats || data.system || data;
+            const gpu = readMetric(stats, ['gpu_percent', 'gpu_utilization', 'gpu.utilization', 'gpu.percent']);
+            const cpu = readMetric(stats, ['cpu_percent', 'cpu_utilization', 'cpu.percent']);
+            const ramUsed = readMetric(stats, ['ram_used_gb', 'memory_used_gb', 'ram.used_gb', 'memory.used_gb']);
+            const ramTotal = readMetric(stats, ['ram_total_gb', 'memory_total_gb', 'ram.total_gb', 'memory.total_gb']);
+            const ramPercent = readMetric(stats, ['ram_percent', 'memory_percent', 'ram.percent', 'memory.percent']);
+            const gpuTemperature = readMetric(stats, ['gpu_temperature_c', 'temperature_c', 'gpu.temperature_c']);
+            const cpuTemperature = readMetric(stats, ['cpu_temperature_c', 'cpu.temperature_c']);
+            updatePercentStat(gpuUtilBar, gpuUtilValue, gpu);
+            updateTemperatureStat(temperatureBar, temperatureValue, gpuTemperature, cpuTemperature);
+            updatePercentStat(cpuUtilBar, cpuUtilValue, cpu);
+            updateMemoryStat(ramUsageBar, ramUsageValue, ramUsed, ramTotal, ramPercent);
+            const name = stats.board_name || stats.hostname || stats.device || stats.board || 'Jetson';
+            systemStatsNote.textContent = `${name} · ${new Date().toLocaleTimeString([], { hour12: false })}`;
+        }
+
+        async function fetchWithTimeout(url, options = {}, timeout = 2500) {
+            const controller = new AbortController();
+            const timeoutId = window.setTimeout(() => controller.abort(), timeout);
+            try {
+                return await fetch(url, { ...options, signal: controller.signal });
+            } finally {
+                window.clearTimeout(timeoutId);
+            }
+        }
+
+        async function refreshModelHealth() {
+            try {
+                const response = await fetchWithTimeout(`${baseURL.value.replace(/\/$/, '')}/health`);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                setModelServiceState('模型在线', 'online');
+                if (!modelIdDiscovered) {
+                    const modelsResponse = await fetchWithTimeout(`${baseURL.value.replace(/\/$/, '')}/v1/models`);
+                    if (modelsResponse.ok) {
+                        const models = await modelsResponse.json();
+                        const modelId = models.data?.[0]?.id;
+                        if (modelId) localModelName.value = modelId;
+                        modelIdDiscovered = true;
+                    }
+                }
+            } catch (error) {
+                setModelServiceState('模型未连接', 'offline');
+            }
+        }
+
+        async function refreshSystemStats() {
+            await refreshModelHealth();
+            const endpoint = systemStatsURL.value.trim();
+            if (!endpoint) {
+                systemStatsNote.textContent = '未配置硬件监控接口；模型状态仍会自动检测。';
+                return;
+            }
+            if (systemStatsAbortController) systemStatsAbortController.abort();
+            systemStatsAbortController = new AbortController();
+            const timeoutId = window.setTimeout(() => systemStatsAbortController.abort(), 2500);
+            try {
+                const response = await fetch(endpoint, { signal: systemStatsAbortController.signal, cache: 'no-store' });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                updateSystemStats(await response.json());
+            } catch (error) {
+                systemStatsNote.textContent = '监控服务未连接（模型状态已单独检测）。';
+            } finally {
+                window.clearTimeout(timeoutId);
+                systemStatsAbortController = null;
+            }
+        }
+
+        function startSystemStats() {
+            if (systemStatsTimer) window.clearInterval(systemStatsTimer);
+            refreshSystemStats();
+            systemStatsTimer = window.setInterval(() => {
+                if (!document.hidden) refreshSystemStats();
+            }, 3000);
+        }
+
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) refreshSystemStats();
         });
 
         // ===== 核心修复：纯净化且自适应的分辨率请求 =====
@@ -1191,11 +1568,17 @@
             if (imageBase64URL) {
                 try {
                     responseText.setAttribute('placeholder', 'Analyzing...');
-                    const response = await sendChatCompletionRequest(instruction, imageBase64URL);
+                    const time = new Date().toLocaleTimeString([], { hour12: false });
+                    responseText.value = `[${time}] ⏳ 正在生成...\n`;
+                    const response = await sendChatCompletionRequest(instruction, imageBase64URL, (delta) => {
+                        if (!isProcessing) return;
+                        responseText.value += delta;
+                        responseText.scrollTop = responseText.scrollHeight;
+                    });
                     if (!isProcessing) return;
                     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
-                    const time = new Date().toLocaleTimeString([], { hour12: false });
-                    responseText.value = `[${time} | ${duration}s] ${response}`;
+                    if (!responseText.value.trim()) responseText.value = `[${time} | ${duration}s] ${response}`;
+                    else responseText.value += `\n[${duration}s | 完成]`;
                     responseText.scrollTop = responseText.scrollHeight;
                 } catch (error) {
                     if (isProcessing) responseText.value = `Error: ${error.message}`;
@@ -1207,32 +1590,78 @@
             if (isProcessing) setTimeout(processingLoop, waitTime);
         }
 
-        async function sendChatCompletionRequest(instruction, imageBase64URL) {
+        async function sendChatCompletionRequest(instruction, imageBase64URL, onDelta = null) {
             abortController = new AbortController();
             try {
-                const response = await fetch(`${baseURL.value}/v1/chat/completions`, {
+                const content = [{ type: 'text', text: instruction }];
+                if (imageBase64URL) {
+                    content.push({ type: 'image_url', image_url: { url: imageBase64URL } });
+                }
+                const body = {
+                    model: localModelName.value.trim() || 'gemma-4-E4B-it',
+                    max_tokens: 512,
+                    temperature: 0.7,
+                    stream: true,
+                    // Gemma 4 默认会输出 reasoning_content；显式关闭可保证普通对话返回正文。
+                    chat_template_kwargs: { enable_thinking: thinkingMode.checked },
+                    messages: [{ role: 'user', content }]
+                };
+                const response = await fetch(`${baseURL.value.replace(/\/$/, '')}/v1/chat/completions`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     signal: abortController.signal,
-                    body: JSON.stringify({
-                        model: "gpt-4-vision-preview",
-                        max_tokens: 100,
-                        temperature: 0.7,
-                        messages: [
-                            {
-                                role: 'user', content: [
-                                    { type: 'text', text: instruction },
-                                    { type: 'image_url', image_url: { url: imageBase64URL } }
-                                ]
-                            },
-                        ]
-                    })
+                    body: JSON.stringify(body)
                 });
-                if (!response.ok) return `Error ${response.status}`;
-                const data = await response.json();
-                return data.choices[0].message.content;
+                if (!response.ok) {
+                    const details = await response.json().catch(() => ({}));
+                    throw new Error(details.error?.message || details.detail || `模型请求失败：HTTP ${response.status}`);
+                }
+                if (!response.body) throw new Error('浏览器不支持流式读取响应。');
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+                let answer = '';
+                let reasoning = '';
+                let didOutputReasoning = false;
+                const emit = (text) => { if (text && onDelta) onDelta(text); };
+                const consumeEvent = (event) => {
+                    const line = event.split(/\r?\n/).find((value) => value.startsWith('data:'));
+                    if (!line) return;
+                    const data = line.slice(5).trim();
+                    if (!data || data === '[DONE]') return;
+                    let payload;
+                    try { payload = JSON.parse(data); } catch (_) { return; }
+                    const delta = payload.choices?.[0]?.delta || {};
+                    if (delta.reasoning_content) {
+                        reasoning += delta.reasoning_content;
+                        if (thinkingMode.checked) {
+                            didOutputReasoning = true;
+                            emit(delta.reasoning_content);
+                        }
+                    }
+                    if (delta.content) {
+                        answer += delta.content;
+                        if (thinkingMode.checked && didOutputReasoning && answer.length === delta.content.length) emit('\n\n最终回答：\n');
+                        emit(delta.content);
+                    }
+                };
+                while (true) {
+                    const { value, done } = await reader.read();
+                    buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+                    const events = buffer.split(/\r?\n\r?\n/);
+                    buffer = events.pop();
+                    events.forEach(consumeEvent);
+                    if (done) break;
+                }
+                if (buffer.trim()) consumeEvent(buffer);
+                const text = thinkingMode.checked && reasoning
+                    ? `${reasoning}${answer ? `\n\n最终回答：\n${answer}` : ''}`
+                    : (answer || reasoning);
+                if (!text) throw new Error('模型未返回有效文本。');
+                return text;
             } catch (error) {
-                return "Aborted.";
+                if (error.name === 'AbortError') throw new Error('请求已取消或超时。');
+                throw error;
             }
         }
 
@@ -1276,109 +1705,63 @@
             else handleStart();
         });
 
-        // ===== 核心重构：对话录音功能（按需请求麦克风，避免干扰摄像头） =====
+        // ===== 完整录音 ASR：整段音频保留上下文，优先准确率 =====
         async function toggleChatRecording() {
-            // 如果正在录音 -> 停止
+            const button = document.getElementById('recordButton');
             if (isRecordingForChat) {
-                // 1. 防止误触：如果录音时间太短（小于 500ms），则取消
-                if (Date.now() - recordStartTime < 500) {
-                    console.log("录音时间太短，取消");
-                    if (asrMediaRecorder) {
-                        asrMediaRecorder.onstop = null;
-                        asrMediaRecorder.stop();
-                    }
-                    isRecordingForChat = false;
-
-                    const currentBtn = document.getElementById('recordButton');
-                    currentBtn.textContent = "🎙️ 点击开始说话";
-                    currentBtn.classList.remove('recording-active');
-                    inputStatus.textContent = "⚠️ 说话时间太短";
-                    return;
-                }
-
-                // 停止录音逻辑
                 if (!asrMediaRecorder || asrMediaRecorder.state === 'inactive') return;
-
-                // 标记状态
                 isRecordingForChat = false;
-
-                // UI 变化 (处理中)
-                const currentBtn = document.getElementById('recordButton');
-                currentBtn.textContent = "⏳ 处理中...";
-                currentBtn.classList.remove('recording-active');
-                inputStatus.textContent = "🔄 正在识别...";
-
-                // 触发停止并触发 onstop 回调
+                button.disabled = true;
+                button.textContent = '⏳ 正在识别...';
+                button.classList.remove('recording-active');
+                inputStatus.textContent = '🔄 正在进行完整语音识别...';
                 asrMediaRecorder.stop();
-
+                return;
             }
-            // 如果未录音 -> 开始
-            else {
-                inputStatus.textContent = "⌛ 请求麦克风权限...";
-                let micStream;
-                try {
-                    // 💡 按需申请纯麦克风流，用户可以选择正确的音频设备
-                    micStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-                } catch (e) {
-                    console.error("获取麦克风失败:", e);
-                    inputStatus.textContent = "❌ 无麦克风权限/设备";
-                    alert("麦克风启动失败: " + e.message + "\n请确保拥有正常的录音设备并已允许网页访问麦克风。");
-                    return;
-                }
 
-                // 创建纯音频录制
+            inputStatus.textContent = '⌛ 请求麦克风权限...';
+            try {
+                const micStream = await navigator.mediaDevices.getUserMedia({
+                    audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true }, video: false
+                });
                 asrMediaRecorder = new MediaRecorder(micStream);
                 asrAudioChunks = [];
-                asrMediaRecorder.ondataavailable = (e) => {
-                    if (e.data.size > 0) asrAudioChunks.push(e.data);
+                asrMediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0) asrAudioChunks.push(event.data);
                 };
 
-                // 在录音结束时，彻底关闭硬件占用
                 asrMediaRecorder.onstop = async () => {
-                    // 停止所有音频轨道，彻底释放硬件占用（让浏览器的录音指示灯熄灭）
-                    micStream.getTracks().forEach(track => track.stop());
-
+                    micStream.getTracks().forEach((track) => track.stop());
                     try {
-                        const audioBlob = new Blob(asrAudioChunks, { type: asrMediaRecorder.mimeType });
-
+                        const audioBlob = new Blob(asrAudioChunks, { type: asrMediaRecorder.mimeType || 'audio/webm' });
                         if (audioBlob.size < 100) {
-                            inputStatus.textContent = "⚠️ 说话时间太短";
+                            inputStatus.textContent = '⚠️ 说话时间太短';
                             return;
                         }
-
-                        // WAV 格式转换并提交
                         const wavBlob = await convertToWav16k(audioBlob);
                         const text = await transcribeAudio(wavBlob);
-
-                        if (text && text.trim().length > 0) {
+                        if (text.trim()) {
                             instructionText.value = text;
-                            inputStatus.textContent = "✅ 识别成功";
+                            inputStatus.textContent = '✅ 识别完成（简体中文）';
                         } else {
-                            inputStatus.textContent = "⚠️ 未识别到内容";
+                            inputStatus.textContent = '⚠️ 未识别到内容';
                         }
-
-                    } catch (e) {
-                        console.error("Decoding/ASR Error:", e);
-                        inputStatus.textContent = `❌ 出错: ${e.message}`;
+                    } catch (error) {
+                        console.error('ASR Error:', error);
+                        inputStatus.textContent = `❌ ASR: ${error.message}`;
                     } finally {
-                        // 恢复按钮状态
-                        currentBtn.disabled = false;
-                        currentBtn.textContent = "🎙️ 点击开始说话";
-                        instructionText.placeholder = "输入文字或点击录音...";
+                        button.disabled = false;
+                        button.textContent = '🎙️ 点击开始说话';
+                        instructionText.placeholder = '输入文字或点击录音...';
                     }
                 };
-
-                // 启动录音
                 asrMediaRecorder.start();
-                isRecordingForChat = true;
-                recordStartTime = Date.now();
-
-                // UI 变化
-                const currentBtn = document.getElementById('recordButton');
-                currentBtn.textContent = "🔴 点击停止录音";
-                currentBtn.classList.add('recording-active');
-                inputStatus.textContent = "🎙️ 正在录音...";
-                instructionText.placeholder = "正在录音...";
+                isRecordingForChat = true; recordStartTime = Date.now();
+                button.textContent = '🔴 点击停止录音'; button.classList.add('recording-active');
+                inputStatus.textContent = '🎙️ 正在录音，停止后进行完整识别...'; instructionText.placeholder = '正在录音...';
+            } catch (error) {
+                inputStatus.textContent = '❌ 无麦克风权限/设备';
+                alert(`麦克风启动失败: ${error.message}`);
             }
         }
 
@@ -1459,7 +1842,10 @@
             const formData = new FormData();
             formData.append('file', audioBlob, 'audio.wav');
             const response = await fetch(`${asrURL.value}/api/asr`, { method: 'POST', body: formData });
-            if (!response.ok) throw new Error(`ASR Failed: ${response.status}`);
+            if (!response.ok) {
+                const error = await response.json().catch(() => ({}));
+                throw new Error(error.detail || `ASR Failed: ${response.status}`);
+            }
             const result = await response.json();
             return result.text || result.result || '';
         }
@@ -1484,6 +1870,31 @@
             return await response.json();
         }
 
+        imageUploadButton.addEventListener('click', () => imageUpload.click());
+        imageUpload.addEventListener('change', () => {
+            const file = imageUpload.files?.[0];
+            if (!file) return;
+            if (!file.type.startsWith('image/')) {
+                inputStatus.textContent = '⚠️ 请选择图片文件';
+                imageUpload.value = '';
+                return;
+            }
+            if (file.size > 10 * 1024 * 1024) {
+                inputStatus.textContent = '⚠️ 图片超过 10 MB，请压缩后再发送';
+                imageUpload.value = '';
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = () => {
+                pendingImageDataUrl = reader.result;
+                imageUploadButton.textContent = '✅';
+                imageUploadButton.title = `已选择：${file.name}（再次点击可替换）`;
+                inputStatus.textContent = `🖼️ 已附加图片：${file.name}`;
+            };
+            reader.onerror = () => { inputStatus.textContent = '❌ 图片读取失败'; };
+            reader.readAsDataURL(file);
+        });
+
         // 发送按钮逻辑
         sendButton.addEventListener('click', async () => {
             const userText = instructionText.value.trim();
@@ -1496,6 +1907,10 @@
             try {
                 await processSmartChat(userText);
                 instructionText.value = "";
+                pendingImageDataUrl = null;
+                imageUpload.value = '';
+                imageUploadButton.textContent = '🖼️';
+                imageUploadButton.title = '选择图片';
                 inputStatus.textContent = "✅ 发送成功";
             } catch (e) {
                 alert("发送失败: " + e.message);
@@ -1521,10 +1936,10 @@
 
                 // ===== 云端模式路由 =====
                 if (isCloudEnabled) {
-                    // 需要摄像头时先抓图
-                    let imageBase64 = null;
+                    // 若用户已附图则优先使用；仅在需要时再调用摄像头。
+                    let imageBase64 = pendingImageDataUrl;
                     const intentResult = await detectIntent(userText).catch(() => ({ needs_camera: false }));
-                    if (intentResult.needs_camera) {
+                    if (intentResult.needs_camera && !imageBase64) {
                         if (!stream) await initCamera();
                         video.classList.add('active');
                         await new Promise(r => setTimeout(r, 3000));
@@ -1542,33 +1957,41 @@
                     return;
                 }
                 // ===== 本地模式 =====
-
-                const intentResult = await detectIntent(userText);
-
-                let imageBase64 = null;
-                if (intentResult.needs_camera) {
-                    if (!stream) await initCamera();
-                    video.classList.add('active');
-                    await new Promise(r => setTimeout(r, 3000));
-                    imageBase64 = captureImage();
-                    if (!isProcessing) {
-                        setTimeout(() => video.classList.remove('active'), 500);
+                let imageBase64 = pendingImageDataUrl;
+                try {
+                    // 控制器存在时优先保留其意图路由能力；未部署时自动直连 llama.cpp。
+                    const intentResult = await detectIntent(userText);
+                    if (intentResult.needs_camera && !imageBase64) {
+                        if (!stream) await initCamera();
+                        video.classList.add('active');
+                        await new Promise(r => setTimeout(r, 800));
+                        imageBase64 = captureImage();
+                        if (!isProcessing) setTimeout(() => video.classList.remove('active'), 500);
                     }
+                    responseText.value += `\n🎯 意图: ${intentResult.intent || '对话'} | 📷: ${imageBase64 ? '是' : '否'}`;
+                    const chatResult = await smartChat(userText, imageBase64);
+                    if (!chatResult.text) throw new Error('控制器未返回文本');
+                    responseText.value = `[${time}] ✅ 控制器完成\nQ: ${userText}\nA: ${chatResult.text}`;
+                    if (chatResult.text) await playTTS(chatResult.text);
+                    return;
+                } catch (controllerError) {
+                    console.warn('[Chat] 控制器不可用，直连本地模型:', controllerError.message);
+                    responseText.value = `[${time}] ✅ 本地模型（流式输出）\nQ: ${userText}\nA: `;
+                    let receivedText = false;
+                    const directText = await sendChatCompletionRequest(userText, imageBase64, (delta) => {
+                        receivedText = true;
+                        responseText.value += delta;
+                        responseText.scrollTop = responseText.scrollHeight;
+                    });
+                    if (!receivedText) responseText.value += directText;
+                    if (directText) await playTTS(directText);
                 }
-
-                responseText.value += `\n🎯 意图: ${intentResult.intent} | 📷: ${intentResult.needs_camera}`;
                 responseText.scrollTop = responseText.scrollHeight;
-
-                const chatResult = await smartChat(userText, imageBase64);
-
-                responseText.value = `[${time}] ✅ 完成\nQ: ${userText}\nA: ${chatResult.text}`;
-                responseText.scrollTop = responseText.scrollHeight;
-
-                if (chatResult.text) await playTTS(chatResult.text);
 
             } catch (error) {
                 responseText.value = `❌ Error: ${error.message}`;
                 console.error(error);
+                throw error;
             }
         }
 
@@ -1962,6 +2385,15 @@
             return await resp.json();
         }
         // ============================================================
+
+        // 页面初始状态与资源回收：关闭页面时停止定时器、请求和摄像头占用。
+        startSystemStats();
+        window.addEventListener('beforeunload', () => {
+            if (systemStatsTimer) window.clearInterval(systemStatsTimer);
+            if (systemStatsAbortController) systemStatsAbortController.abort();
+            if (abortController) abortController.abort();
+            stream?.getTracks().forEach(track => track.stop());
+        });
 
     </script>
 </body>

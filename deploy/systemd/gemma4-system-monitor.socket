@@ -1,0 +1,10 @@
+[Unit]
+Description=Gemma4 on-demand system monitor socket
+
+[Socket]
+ListenStream=8001
+BindIPv6Only=both
+NoDelay=true
+
+[Install]
+WantedBy=sockets.target

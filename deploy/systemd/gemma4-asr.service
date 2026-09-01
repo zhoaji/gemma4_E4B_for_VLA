@@ -1,0 +1,18 @@
+[Unit]
+Description=Gemma4 on-demand CUDA Whisper ASR
+Requires=gemma4-asr.socket
+After=gemma4-asr.socket
+
+[Service]
+Type=simple
+User=nvidia
+Group=nvidia
+WorkingDirectory=/home/nvidia/Desktop/gemma4_E4B
+Environment=ASR_LANGUAGE=auto
+Environment=ASR_FALLBACK_MODEL=base
+ExecStart=/home/nvidia/anaconda3/bin/python3 /home/nvidia/Desktop/gemma4_E4B/app/brain/asr/server.py --socket-activation --idle-seconds 180
+Restart=no
+TimeoutStopSec=15
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=full

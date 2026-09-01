@@ -1,0 +1,16 @@
+[Unit]
+Description=Gemma4 on-demand HTTPS UI, model proxy and monitor
+Requires=gemma4-edge-https.socket
+After=gemma4-edge-https.socket
+
+[Service]
+Type=simple
+User=nvidia
+Group=nvidia
+WorkingDirectory=/home/nvidia/Desktop/gemma4_E4B
+ExecStart=/usr/bin/python3 /home/nvidia/Desktop/gemma4_E4B/app/brain/monitor/server.py --socket-activation --idle-seconds 90 --tls --cert /home/nvidia/Desktop/gemma4_E4B/data/certs/ui-cert.pem --key /home/nvidia/Desktop/gemma4_E4B/data/certs/ui-key.pem
+Restart=no
+TimeoutStopSec=10
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=full
