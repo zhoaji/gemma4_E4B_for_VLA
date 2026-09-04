@@ -898,15 +898,731 @@
             border-color: #667eea;
             color: white;
         }
+
+        /* ===== Glass refinement: multi-layer dark liquid glass ===== */
+        :root {
+            --glass-surface: rgba(12, 20, 39, .56);
+            --glass-surface-strong: rgba(19, 29, 53, .74);
+            --glass-stroke: rgba(207, 226, 255, .22);
+            --glass-stroke-soft: rgba(255, 255, 255, .08);
+            --glass-highlight: rgba(255, 255, 255, .34);
+            --ink-primary: #f3f7ff;
+            --ink-secondary: rgba(226, 235, 252, .70);
+            --accent-glow: rgba(72, 163, 255, .36);
+        }
+
+        body {
+            background: #040712;
+            color: var(--ink-primary);
+        }
+
+        .viewport {
+            isolation: isolate;
+            background:
+                radial-gradient(900px 620px at 8% 108%, rgba(49, 105, 255, .25), transparent 64%),
+                radial-gradient(700px 470px at 92% -8%, rgba(143, 74, 255, .21), transparent 60%),
+                radial-gradient(500px 360px at 54% 44%, rgba(24, 183, 236, .09), transparent 70%),
+                linear-gradient(135deg, #050816 0%, #0a1022 48%, #050711 100%);
+        }
+
+        .viewport::before,
+        .viewport::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        .viewport::before {
+            background:
+                linear-gradient(112deg, rgba(255, 255, 255, .055), transparent 28%, transparent 70%, rgba(131, 164, 255, .06)),
+                radial-gradient(ellipse at 50% 50%, transparent 48%, rgba(1, 4, 14, .48) 100%);
+        }
+
+        .viewport::after {
+            opacity: .25;
+            background-image: radial-gradient(rgba(255, 255, 255, .42) .55px, transparent .7px);
+            background-size: 5px 5px;
+            mix-blend-mode: soft-light;
+        }
+
+        #videoFeed {
+            z-index: 0;
+            opacity: 0;
+            filter: brightness(.56) saturate(.82) contrast(1.08);
+            transform: scale(1.015);
+        }
+
+        #videoFeed.active {
+            opacity: .64;
+        }
+
+        .app-title {
+            top: 18px;
+            left: 22px;
+            z-index: 12;
+            padding: 8px 13px;
+            border: 1px solid rgba(229, 239, 255, .28);
+            border-radius: 999px;
+            color: var(--ink-primary);
+            font-size: 12px;
+            letter-spacing: .12em;
+            text-transform: uppercase;
+            background: rgba(15, 24, 45, .50);
+            box-shadow: 0 10px 28px rgba(0, 0, 0, .22), inset 0 1px 0 rgba(255,255,255,.26);
+            backdrop-filter: blur(22px) saturate(145%);
+            -webkit-backdrop-filter: blur(22px) saturate(145%);
+        }
+
+        .floating-panel {
+            overflow: hidden;
+            border: 1px solid transparent;
+            border-radius: 24px;
+            background:
+                linear-gradient(140deg, rgba(33, 48, 80, .70), rgba(10, 17, 35, .47) 52%, rgba(22, 18, 49, .53)) padding-box,
+                linear-gradient(135deg, rgba(255,255,255,.50), rgba(183,211,255,.14) 38%, rgba(255,255,255,.10) 70%, rgba(158,121,255,.30)) border-box;
+            box-shadow:
+                0 22px 54px rgba(0, 0, 0, .34),
+                0 3px 14px rgba(3, 8, 25, .22),
+                inset 0 1px 0 var(--glass-highlight),
+                inset 0 -1px 0 rgba(2, 6, 18, .28);
+            backdrop-filter: blur(28px) saturate(148%);
+            -webkit-backdrop-filter: blur(28px) saturate(148%);
+            transition: transform .28s cubic-bezier(.2,.75,.25,1), box-shadow .28s ease, border-color .28s ease;
+        }
+
+        .floating-panel::before {
+            content: '';
+            position: absolute;
+            left: 1px;
+            right: 1px;
+            top: 1px;
+            height: 43%;
+            border-radius: 23px 23px 48% 48%;
+            background: linear-gradient(180deg, rgba(255,255,255,.105), rgba(255,255,255,0));
+            pointer-events: none;
+        }
+
+        .floating-panel > * {
+            position: relative;
+            z-index: 1;
+        }
+
+        .floating-panel:hover {
+            transform: translateY(-3px);
+            background:
+                linear-gradient(140deg, rgba(40, 59, 97, .75), rgba(12, 20, 42, .55) 52%, rgba(28, 22, 61, .58)) padding-box,
+                linear-gradient(135deg, rgba(255,255,255,.62), rgba(183,211,255,.20) 38%, rgba(255,255,255,.14) 70%, rgba(174,135,255,.40)) border-box;
+            box-shadow: 0 30px 68px rgba(0, 0, 0, .42), 0 0 0 1px rgba(118, 181, 255, .06), inset 0 1px 0 rgba(255,255,255,.42);
+        }
+
+        .panel-system-stats {
+            top: 82px;
+            left: 322px;
+            right: 22px;
+            padding: 16px 18px 18px;
+            gap: 14px;
+        }
+
+        .system-stats-header {
+            color: var(--ink-primary);
+            font-size: 12px;
+            letter-spacing: .06em;
+        }
+
+        .system-stat-card {
+            padding: 13px 14px;
+            border-color: rgba(220, 234, 255, .13);
+            border-radius: 16px;
+            background: linear-gradient(145deg, rgba(255,255,255,.075), rgba(255,255,255,.022));
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.10), inset 0 -1px 0 rgba(0,0,0,.12);
+        }
+
+        .system-stat-card-value { color: #fff; }
+        .system-stat-card-label, .system-stats-note { color: var(--ink-secondary); }
+        .stat-track { background: rgba(1, 5, 17, .38); box-shadow: inset 0 1px 3px rgba(0,0,0,.3); }
+        .stat-bar { background: linear-gradient(90deg, #56d4ff, #5598ff 58%, #aa76ff); box-shadow: 0 0 12px rgba(91, 171, 255, .52); }
+
+        .panel-controls {
+            top: 18px;
+            right: 22px;
+            gap: 8px;
+            padding: 10px 11px 10px 16px;
+            border-radius: 20px;
+        }
+
+        .panel-tts {
+            top: 74px;
+            left: 22px;
+            width: 276px;
+            max-height: calc(100vh - 292px);
+            padding: 16px;
+        }
+
+        .panel-input {
+            left: 22px;
+            bottom: 22px;
+            width: 276px;
+            padding: 16px;
+        }
+
+        .panel-output {
+            left: 322px;
+            right: 22px;
+            bottom: 22px;
+            height: 164px;
+            padding: 17px;
+            gap: 18px;
+        }
+
+        label { color: var(--ink-secondary); letter-spacing: .09em; }
+
+        input, textarea, select {
+            border-color: rgba(219, 233, 255, .17);
+            background: rgba(5, 11, 28, .31);
+            color: var(--ink-primary);
+            box-shadow: inset 0 1px 1px rgba(255,255,255,.08), inset 0 -1px 3px rgba(0,0,0,.22);
+            backdrop-filter: blur(18px) saturate(120%);
+            -webkit-backdrop-filter: blur(18px) saturate(120%);
+            transition: border-color .2s ease, background .2s ease, box-shadow .2s ease;
+        }
+
+        input::placeholder, textarea::placeholder { color: rgba(226, 235, 252, .40); }
+
+        input:focus, textarea:focus, select:focus {
+            border-color: rgba(111, 185, 255, .78);
+            background: rgba(12, 23, 49, .58);
+            box-shadow: inset 0 1px 1px rgba(255,255,255,.13), 0 0 0 3px rgba(64, 152, 255, .14), 0 0 24px rgba(46, 126, 255, .12);
+        }
+
+        .panel-output textarea {
+            color: #edf6ff;
+            background: linear-gradient(135deg, rgba(7, 17, 38, .58), rgba(20, 28, 59, .39));
+            border-color: rgba(222, 235, 255, .15);
+            font-weight: 400;
+            line-height: 1.6 !important;
+        }
+
+        #startButton, #recordButton, #sendButton, #imageUploadButton, .panel-tts .tts-btn {
+            border: 1px solid rgba(255,255,255,.22);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.35), 0 9px 20px rgba(1, 9, 30, .24);
+            transition: transform .18s ease, filter .18s ease, box-shadow .18s ease;
+        }
+
+        #startButton.start, #sendButton { background: linear-gradient(135deg, #3aa8ff, #3978ff 54%, #725bff); }
+        #recordButton { background: linear-gradient(135deg, #2fd4aa, #1baf76 54%, #149a72); }
+        #imageUploadButton { background: linear-gradient(135deg, #cc73ff, #8b5cff 58%, #5b72ff); }
+        .panel-tts .btn-upload { background: linear-gradient(135deg, #52c9ff, #397aff); }
+        .panel-tts .btn-play { background: linear-gradient(135deg, #5ae0aa, #2bbd7f); }
+
+        #startButton:hover, #recordButton:hover, #sendButton:hover, #imageUploadButton:hover, .panel-tts .tts-btn:hover {
+            transform: translateY(-2px);
+            filter: brightness(1.09);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.46), 0 12px 25px rgba(9, 65, 160, .28);
+        }
+
+        #newConversationButton {
+            border-color: rgba(172, 210, 255, .24) !important;
+            background: rgba(124, 160, 255, .13) !important;
+            color: rgba(237, 245, 255, .90) !important;
+            transition: background .2s ease, transform .2s ease, border-color .2s ease;
+        }
+
+        #newConversationButton:hover { background: rgba(118, 165, 255, .28) !important; border-color: rgba(174, 211, 255, .55) !important; transform: translateY(-1px); }
+
+        .modal-overlay { background: rgba(2, 5, 15, .65); backdrop-filter: blur(16px) saturate(120%); -webkit-backdrop-filter: blur(16px) saturate(120%); }
+        .modal-content { background: rgba(14, 22, 45, .82); border-color: rgba(221, 234, 255, .23); box-shadow: 0 32px 90px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.18); }
+        .settings-sidebar { border-color: rgba(220, 234, 255, .12); }
+        .settings-sidebar-item.active { background: linear-gradient(135deg, rgba(80, 145, 255, .24), rgba(126, 95, 255, .24)); border-left-color: #73b9ff; }
+
+        ::-webkit-scrollbar { width: 7px; height: 7px; }
+        ::-webkit-scrollbar-track { background: rgba(3, 8, 23, .28); }
+        ::-webkit-scrollbar-thumb { background: linear-gradient(180deg, rgba(149, 191, 255, .45), rgba(116, 110, 255, .35)); border-radius: 999px; }
+
+        @media (max-width: 900px) {
+            .viewport { background: linear-gradient(160deg, #060a18, #111639 55%, #080a16); }
+            .floating-panel { border-radius: 21px; }
+            .panel-tts { max-height: none; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; }
+        }
+
+        /* ===== Docked panels: prevent overlap and reveal on hover/focus ===== */
+        .panel-tts,
+        .panel-input,
+        .panel-system-stats,
+        .panel-output {
+            box-sizing: border-box;
+        }
+
+        /* 左侧 TTS 收纳为可见的窄标签；悬停左边缘或键盘聚焦后展开。 */
+        .panel-tts {
+            top: 74px;
+            left: 10px;
+            width: 292px;
+            max-height: calc(100vh - 292px);
+            z-index: 22;
+            transform: translateX(calc(-100% + 48px));
+            transition: transform .32s cubic-bezier(.2,.8,.2,1), box-shadow .28s ease;
+        }
+
+        .panel-tts::after {
+            content: '🔊';
+            position: absolute;
+            right: 10px;
+            top: 16px;
+            z-index: 3;
+            width: 27px;
+            height: 27px;
+            display: grid;
+            place-items: center;
+            border: 1px solid rgba(213, 232, 255, .22);
+            border-radius: 10px;
+            background: rgba(100, 151, 255, .16);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.18);
+            font-size: 13px;
+            opacity: 1;
+            transition: opacity .18s ease;
+            pointer-events: none;
+        }
+
+        .panel-tts:hover,
+        .panel-tts:focus-within {
+            transform: translateX(0);
+            box-shadow: 0 30px 68px rgba(0, 0, 0, .46), 0 0 26px rgba(72, 139, 255, .12), inset 0 1px 0 rgba(255,255,255,.42);
+        }
+
+        .panel-tts:hover::after,
+        .panel-tts:focus-within::after { opacity: 0; }
+
+        /* 状态栏收纳在右侧；展开时不会与左侧抽屉相交。 */
+        .panel-system-stats {
+            left: 356px;
+            right: 22px;
+            /* 让状态栏明确位于右上角控制条下方，避免设备信息与按钮重叠。 */
+            top: 106px;
+            z-index: 11;
+            transform: translateX(calc(100% - 58px));
+            transition: transform .32s cubic-bezier(.2,.8,.2,1), box-shadow .28s ease;
+        }
+
+        .panel-system-stats::after {
+            content: '📊';
+            position: absolute;
+            left: 13px;
+            top: 15px;
+            z-index: 3;
+            width: 29px;
+            height: 29px;
+            display: grid;
+            place-items: center;
+            border: 1px solid rgba(213, 232, 255, .22);
+            border-radius: 10px;
+            background: rgba(100, 151, 255, .16);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.18);
+            font-size: 14px;
+            opacity: 1;
+            transition: opacity .18s ease;
+            pointer-events: none;
+        }
+
+        .panel-system-stats:hover,
+        .panel-system-stats:focus-within {
+            transform: translateX(0);
+            z-index: 24;
+            box-shadow: 0 30px 68px rgba(0, 0, 0, .46), 0 0 26px rgba(72, 139, 255, .12), inset 0 1px 0 rgba(255,255,255,.42);
+        }
+
+        .panel-system-stats:hover::after,
+        .panel-system-stats:focus-within::after { opacity: 0; }
+
+        /* 输入面板向右扩展；输出/状态同步右移，持续保留 24px 间距。 */
+        .panel-input { left: 22px; width: 310px; bottom: 22px; }
+        .panel-output { left: 356px; right: 22px; bottom: 22px; }
+
+        @media (max-width: 900px) {
+            .panel-tts,
+            .panel-system-stats {
+                transform: none;
+            }
+
+            .panel-tts::after,
+            .panel-system-stats::after { display: none; }
+        }
+
+        /* ===== Example-inspired liquid glass layers (HTML + CSS only) ===== */
+        .liquid-glass-definitions {
+            position: absolute;
+            width: 0;
+            height: 0;
+            overflow: hidden;
+        }
+
+        .ambient-glass-scene {
+            position: absolute;
+            inset: 0;
+            z-index: 1;
+            overflow: hidden;
+            pointer-events: none;
+        }
+
+        .ambient-orb {
+            position: absolute;
+            display: block;
+            width: clamp(340px, 42vw, 760px);
+            aspect-ratio: 1;
+            border-radius: 50%;
+            filter: blur(2px);
+            opacity: .48;
+            mix-blend-mode: screen;
+            animation: float-glass-orb 24s ease-in-out infinite alternate;
+        }
+
+        .orb-cyan {
+            left: -14vw;
+            bottom: -27vw;
+            background: radial-gradient(circle at 36% 35%, rgba(114, 237, 255, .63), rgba(50, 133, 255, .24) 37%, transparent 70%);
+        }
+
+        .orb-violet {
+            right: -16vw;
+            top: -28vw;
+            background: radial-gradient(circle at 38% 46%, rgba(208, 131, 255, .58), rgba(106, 82, 255, .22) 42%, transparent 70%);
+            animation-delay: -8s;
+            animation-duration: 31s;
+        }
+
+        .orb-blue {
+            width: clamp(220px, 28vw, 510px);
+            left: 44%;
+            top: 34%;
+            background: radial-gradient(circle, rgba(69, 168, 255, .34), transparent 67%);
+            animation-delay: -14s;
+            animation-duration: 28s;
+        }
+
+        .ambient-grid {
+            position: absolute;
+            inset: 0;
+            opacity: .17;
+            background-image: linear-gradient(rgba(178, 210, 255, .12) 1px, transparent 1px), linear-gradient(90deg, rgba(178, 210, 255, .12) 1px, transparent 1px);
+            background-size: 46px 46px;
+            -webkit-mask-image: radial-gradient(ellipse at center, black, transparent 72%);
+            mask-image: radial-gradient(ellipse at center, black, transparent 72%);
+        }
+
+        @keyframes float-glass-orb {
+            from { transform: translate3d(-2%, -1%, 0) scale(.96); }
+            to { transform: translate3d(5%, 4%, 0) scale(1.05); }
+        }
+
+        .floating-panel {
+            isolation: isolate;
+            background: rgba(18, 28, 52, .22);
+            border-color: rgba(230, 242, 255, .25);
+            box-shadow: 0 22px 58px rgba(0, 5, 25, .38), inset 0 1px 0 rgba(255,255,255,.24), inset 0 -1px 0 rgba(6,10,28,.28);
+            backdrop-filter: blur(8px) saturate(126%);
+            -webkit-backdrop-filter: blur(8px) saturate(126%);
+        }
+
+        .liquidGlass-effect,
+        .liquidGlass-tint,
+        .liquidGlass-shine {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            border-radius: inherit;
+        }
+
+        .liquidGlass-effect {
+            z-index: 0;
+            overflow: hidden;
+            isolation: isolate;
+            background: rgba(111, 165, 255, .08);
+            backdrop-filter: blur(13px) saturate(150%);
+            -webkit-backdrop-filter: blur(13px) saturate(150%);
+            filter: url(#glass-distortion);
+        }
+
+        .liquidGlass-tint {
+            z-index: 1;
+            background: linear-gradient(135deg, rgba(219, 238, 255, .20), rgba(69, 109, 181, .10) 41%, rgba(77, 48, 150, .13) 100%);
+        }
+
+        .liquidGlass-shine {
+            z-index: 2;
+            overflow: hidden;
+            box-shadow: inset 1.5px 1.5px 1px rgba(255, 255, 255, .60), inset -1px -1px 1px rgba(212, 222, 255, .18), inset 0 18px 28px -22px rgba(255,255,255,.76);
+        }
+
+        .liquidGlass-shine::before {
+            content: '';
+            position: absolute;
+            width: 78%;
+            height: 66%;
+            top: -38%;
+            left: -18%;
+            transform: rotate(-12deg);
+            background: radial-gradient(ellipse, rgba(255,255,255,.28), transparent 67%);
+            opacity: .8;
+        }
+
+        .floating-panel > :not(.liquidGlass-effect):not(.liquidGlass-tint):not(.liquidGlass-shine) {
+            z-index: 4;
+        }
+
+        .floating-panel::before { z-index: 3; opacity: .28; }
+        .panel-tts::after, .panel-system-stats::after { z-index: 6; }
+
+        .floating-panel:hover .liquidGlass-tint { background: linear-gradient(135deg, rgba(230, 244, 255, .25), rgba(78, 126, 209, .13) 41%, rgba(94, 62, 177, .18) 100%); }
+        .floating-panel:hover .liquidGlass-shine { box-shadow: inset 1.5px 1.5px 1px rgba(255, 255, 255, .74), inset -1px -1px 1px rgba(212, 222, 255, .24), inset 0 18px 30px -21px rgba(255,255,255,.88); }
+
+        /* 未开启相机时使用静态背景；相机画面激活后以全不透明视频覆盖。 */
+        .viewport {
+            background: linear-gradient(140deg, rgba(2, 7, 22, .34), rgba(4, 8, 25, .13)), url("image3.jpg") center / cover no-repeat;
+        }
+
+        /* 真实玻璃库只能捕获根节点的子元素，故背景放在 viewport 内而非仅作为 CSS 背景。 */
+        .background-scene {
+            position: absolute;
+            inset: 0;
+            z-index: 0;
+            width: 100%;
+            height: 100%;
+            display: block;
+            object-fit: cover;
+            filter: brightness(.84) saturate(.92);
+        }
+
+        #videoFeed { z-index: 1; }
+        #videoFeed:not(.active) { display: none; }
+        #videoFeed.active { display: block; }
+        .ambient-glass-scene { z-index: 2; }
+        .ambient-glass-scene { transition: opacity .32s ease; }
+
+        #videoFeed.active { opacity: 1; }
+        #videoFeed.active ~ .ambient-glass-scene { opacity: 0; }
+
+        /* 输出面板整条顶部边缘均可拖动；拖动时由脚本同步左侧输入面板高度。 */
+        .output-resize-handle {
+            position: absolute;
+            top: 0;
+            right: 0;
+            left: 0;
+            z-index: 8;
+            height: 18px;
+            border-radius: 24px 24px 10px 10px;
+            cursor: ns-resize;
+            touch-action: none;
+            background: linear-gradient(180deg, rgba(211, 236, 255, .13), rgba(174, 211, 255, 0));
+            border-top: 1px solid rgba(230, 244, 255, .34);
+            opacity: .58;
+            transition: opacity .18s ease, background-color .18s ease, border-color .18s ease;
+        }
+
+        .output-resize-handle:hover,
+        .output-resize-handle:focus-visible {
+            opacity: 1;
+            border-top-color: rgba(177, 224, 255, .95);
+            background: linear-gradient(180deg, rgba(154, 213, 255, .24), rgba(154, 213, 255, 0));
+            outline: none;
+        }
+
+        /* 让背景清晰透过玻璃：面板、色膜与文字输入层均使用低透明度。 */
+        .floating-panel {
+            background: rgba(7, 15, 36, .10);
+            border-color: rgba(234, 245, 255, .34);
+            box-shadow: 0 18px 48px rgba(0, 5, 25, .24), inset 0 1px 0 rgba(255,255,255,.29), inset 0 -1px 0 rgba(5,10,29,.20);
+            backdrop-filter: blur(6px) saturate(128%);
+            -webkit-backdrop-filter: blur(6px) saturate(128%);
+        }
+
+        .floating-panel:hover {
+            background: rgba(10, 22, 49, .16);
+            box-shadow: 0 22px 54px rgba(0, 5, 25, .30), 0 0 22px rgba(84, 160, 255, .10), inset 0 1px 0 rgba(255,255,255,.38);
+        }
+
+        .liquidGlass-effect {
+            background: rgba(92, 158, 255, .025);
+            backdrop-filter: blur(7px) saturate(135%);
+            -webkit-backdrop-filter: blur(7px) saturate(135%);
+        }
+
+        .liquidGlass-tint {
+            background: linear-gradient(135deg, rgba(219, 238, 255, .10), rgba(69, 109, 181, .035) 41%, rgba(77, 48, 150, .065) 100%);
+        }
+
+        .floating-panel:hover .liquidGlass-tint {
+            background: linear-gradient(135deg, rgba(230, 244, 255, .14), rgba(78, 126, 209, .055) 41%, rgba(94, 62, 177, .09) 100%);
+        }
+
+        .floating-panel::before { opacity: .16; }
+
+        input, textarea, select,
+        .panel-output textarea {
+            background: rgba(4, 11, 29, .16);
+        }
+
+        .panel-output textarea {
+            background: linear-gradient(135deg, rgba(5, 15, 37, .11), rgba(27, 42, 80, .055));
+        }
+
+        .system-stat-card {
+            background: rgba(5, 13, 33, .12);
+        }
+
+        /* LiquidGlass 加载成功后改用其 WebGL 折射画布，保留 CSS 作为不支持时的降级。 */
+        .viewport.webgl-glass-ready > .floating-panel {
+            background: transparent !important;
+            border: 1px solid rgba(235, 245, 255, 0.82) !important;
+            box-shadow:
+                inset 0 0 0 1px rgba(255, 255, 255, 0.34),
+                0 0 18px rgba(170, 220, 255, 0.15) !important;
+            backdrop-filter: none;
+            -webkit-backdrop-filter: none;
+            /* 裁切 LiquidGlass 画布额外的阴影缓冲，防止产生第二道悬浮圆角。 */
+            overflow: hidden !important;
+        }
+
+        /* 库的画布必须位于面板背景之上、内容之下，才能让折射参数真实可见。 */
+        .viewport.webgl-glass-ready > .floating-panel > canvas {
+            z-index: 0 !important;
+        }
+
+        .viewport.webgl-glass-ready > .floating-panel::before,
+        .viewport.webgl-glass-ready > .floating-panel > .liquidGlass-effect,
+        .viewport.webgl-glass-ready > .floating-panel > .liquidGlass-tint,
+        .viewport.webgl-glass-ready > .floating-panel > .liquidGlass-shine {
+            display: none;
+        }
+
+        /* 输入操作：仅保留独立按钮，不再额外包裹玻璃操作条。 */
+        .input-action-row {
+            display: grid !important;
+            grid-template-columns: 42px minmax(0, 1fr) 58px;
+            align-items: center;
+            gap: 8px;
+            margin-top: 10px !important;
+            padding: 0;
+            min-height: 40px;
+        }
+
+        .panel-input .input-action-button {
+            width: 100%;
+            min-height: 40px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            padding: 7px 6px !important;
+            border: 1px solid rgba(255,255,255,.38) !important;
+            border-radius: 12px !important;
+            color: #fff;
+            font-size: 12px !important;
+            font-weight: 700;
+            line-height: 1.1;
+            letter-spacing: .01em;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.34), 0 6px 14px rgba(0, 8, 28, .22) !important;
+        }
+
+        .panel-input .input-action-icon { font-size: 14px; line-height: 1; }
+        .panel-input .input-action-label { white-space: nowrap; }
+
+        .panel-input #imageUploadButton.input-action-button {
+            background: linear-gradient(135deg, rgba(202, 113, 255, .96), rgba(104, 87, 238, .92)) !important;
+        }
+
+        .panel-input #recordButton.input-action-button {
+            background: linear-gradient(135deg, rgba(47, 212, 170, .94), rgba(26, 163, 112, .92)) !important;
+        }
+
+        .panel-input #sendButton.input-action-button {
+            background: linear-gradient(135deg, rgba(62, 168, 255, .96), rgba(70, 104, 247, .93)) !important;
+        }
+
+        .panel-input .input-action-button:hover {
+            transform: translateY(-1px) !important;
+            filter: brightness(1.10);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.52), 0 9px 18px rgba(17, 88, 187, .28) !important;
+        }
+
+        .panel-input #recordButton.input-action-button.recording-active,
+        .panel-input #recordButton.input-action-button:active {
+            background: linear-gradient(135deg, #ff665a, #c92a1e) !important;
+        }
+
+        /* 桌面端：输入、输出共用高度；输入区域优先获得新增的可用空间。 */
+        @media (min-width: 901px) {
+            .panel-input,
+            .panel-output {
+                height: clamp(184px, 22vh, 210px);
+            }
+
+            .panel-input {
+                gap: 8px;
+            }
+
+            .panel-input > div {
+                margin-top: 0 !important;
+            }
+
+            .panel-input > div:first-of-type {
+                display: flex;
+                flex: 1 1 auto;
+                min-height: 0;
+                flex-direction: column;
+            }
+
+            .panel-input #instructionText {
+                height: auto !important;
+                min-height: 64px;
+                flex: 1 1 auto;
+                resize: none;
+            }
+
+            .panel-input #inputStatus,
+            .panel-input > div:last-of-type {
+                flex: 0 0 auto;
+            }
+
+            /* 为加高的输入面板留出与 TTS 面板的安全间距。 */
+            .panel-tts { max-height: calc(100vh - 342px); }
+        }
+
+        @media (max-width: 900px) {
+            .output-resize-handle { display: none; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .ambient-orb { animation: none; }
+        }
     </style>
 </head>
 
 <body>
 
     <div class="viewport">
+        <img class="background-scene" src="image3.jpg" alt="" aria-hidden="true">
+        <!-- 纯视觉层：为液态玻璃提供可折射的环境纹理，不参与交互。 -->
+        <svg class="liquid-glass-definitions" aria-hidden="true" focusable="false">
+            <filter id="glass-distortion" x="-15%" y="-15%" width="130%" height="130%" color-interpolation-filters="sRGB">
+                <feTurbulence type="fractalNoise" baseFrequency="0.008 0.016" numOctaves="2" seed="17" result="noise" />
+                <feGaussianBlur in="noise" stdDeviation="1.2" result="softNoise" />
+                <feDisplacementMap in="SourceGraphic" in2="softNoise" scale="13" xChannelSelector="R" yChannelSelector="G" />
+            </filter>
+        </svg>
         <!-- 视频背景 -->
         <video id="videoFeed" autoplay playsinline></video>
         <canvas id="canvas" class="hidden"></canvas>
+        <div class="ambient-glass-scene" aria-hidden="true">
+            <span class="ambient-orb orb-cyan"></span>
+            <span class="ambient-orb orb-violet"></span>
+            <span class="ambient-orb orb-blue"></span>
+            <span class="ambient-grid"></span>
+        </div>
 
         <div class="app-title">Vision Spatial Pro</div>
 
@@ -1103,7 +1819,11 @@
         <!-- 模块2：左下角输入 (整合了语音助手) -->
         <div class="floating-panel panel-input">
             <div style="margin-top: 0 !important;">
-                <label for="instructionText">Instruction</label>
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+                    <label for="instructionText">Instruction</label>
+                    <button id="newConversationButton" type="button" title="创建不继承旧记忆的新对话"
+                        style="padding:4px 9px;border:1px solid rgba(255,255,255,.22);border-radius:10px;background:rgba(255,255,255,.1);color:white;font-size:10px;cursor:pointer;">＋ 新对话</button>
+                </div>
                 <textarea id="instructionText" rows="3" style="height: 70px;" placeholder="输入文字或按住录音..."></textarea>
             </div>
 
@@ -1111,14 +1831,18 @@
                 style="font-size: 11px; color: var(--accent-color); font-weight: 600; margin-top: 8px; min-height: 16px;">
             </div>
 
-            <div style="display: flex; gap: 10px; margin-top: 12px;">
+            <div class="input-action-row" aria-label="输入操作">
                 <input id="imageUpload" type="file" accept="image/*" hidden>
-                <button id="imageUploadButton" type="button" title="选择图片" style="flex:0 0 48px;">🖼️</button>
-                <button id="recordButton">
-                    🎙️ 按住说话
+                <button id="imageUploadButton" class="input-action-button" type="button" title="选择图片">
+                    <span class="input-action-icon" aria-hidden="true">🖼️</span>
                 </button>
-                <button id="sendButton">
-                    🚀 发送
+                <button id="recordButton" class="input-action-button" title="点击开始或停止语音输入">
+                    <span class="input-action-icon" aria-hidden="true">🎙️</span>
+                    <span class="input-action-label">语音输入</span>
+                </button>
+                <button id="sendButton" class="input-action-button" title="发送消息">
+                    <span class="input-action-icon" aria-hidden="true">🚀</span>
+                    <span class="input-action-label">发送</span>
                 </button>
             </div>
         </div>
@@ -1128,6 +1852,8 @@
             <label for="responseText">AI Analysis</label>
             <textarea id="responseText" readonly style="height: 160px; line-height: 1.5;"
                 placeholder="System Ready..."></textarea>
+            <div id="outputResizeHandle" class="output-resize-handle" role="separator" aria-orientation="horizontal"
+                aria-label="调整分析输出区域高度" tabindex="0" title="沿输出框顶部边缘任意位置上下拖动；双击恢复默认高度"></div>
         </div>
 
         <!-- TTS 模块：左侧中间 -->
@@ -1219,8 +1945,119 @@
         </div>
     </div>
 
-    <script>
-        const video = document.getElementById('videoFeed');
+<script>
+// 仅为既有面板补充玻璃的三层视觉结构；不改变面板内功能节点或事件绑定。
+function installLiquidGlassLayers() {
+  document.querySelectorAll('.floating-panel').forEach((panel) => {
+    if (panel.querySelector(':scope > .liquidGlass-effect')) return;
+
+    const layers = document.createDocumentFragment();
+    ['liquidGlass-effect', 'liquidGlass-tint', 'liquidGlass-shine'].forEach((className) => {
+      const layer = document.createElement('span');
+      layer.className = className;
+      layer.setAttribute('aria-hidden', 'true');
+      layers.appendChild(layer);
+    });
+    panel.prepend(layers);
+  });
+}
+
+installLiquidGlassLayers();
+
+// 输出区可由用户上下拖动；桌面端同步输入区高度，避免两块底部面板失去对齐。
+const outputPanel = document.querySelector('.panel-output');
+const inputPanel = document.querySelector('.panel-input');
+const ttsPanel = document.querySelector('.panel-tts');
+const outputResizeHandle = document.getElementById('outputResizeHandle');
+const outputHeightStorageKey = 'vision-spatial-output-height';
+
+function isDesktopPanelLayout() {
+  return window.matchMedia('(min-width: 901px)').matches;
+}
+
+function getOutputHeightLimits() {
+  const minimum = 184;
+  // 输出区向上扩展，但为顶部控制栏和状态栏保留足够空间。
+  return { minimum, maximum: Math.max(minimum, window.innerHeight - 132) };
+}
+
+function setLinkedBottomPanelHeight(requestedHeight, persist = false) {
+  if (!isDesktopPanelLayout() || !outputPanel || !inputPanel) return;
+
+  const { minimum, maximum } = getOutputHeightLimits();
+  const height = Math.round(Math.min(maximum, Math.max(minimum, requestedHeight)));
+  outputPanel.style.height = `${height}px`;
+  inputPanel.style.height = `${height}px`;
+
+  // TTS 面板始终止于输入区上方，避免展开时与加高后的输入区重合。
+  if (ttsPanel) {
+    ttsPanel.style.maxHeight = `${Math.max(160, window.innerHeight - height - 132)}px`;
+  }
+  if (outputResizeHandle) outputResizeHandle.setAttribute('aria-valuenow', String(height));
+  if (persist) localStorage.setItem(outputHeightStorageKey, String(height));
+}
+
+function resetLinkedBottomPanelHeight() {
+  if (!outputPanel || !inputPanel) return;
+  outputPanel.style.removeProperty('height');
+  inputPanel.style.removeProperty('height');
+  if (ttsPanel) ttsPanel.style.removeProperty('max-height');
+  localStorage.removeItem(outputHeightStorageKey);
+}
+
+if (outputPanel && inputPanel && outputResizeHandle) {
+  const savedHeight = Number(localStorage.getItem(outputHeightStorageKey));
+  if (Number.isFinite(savedHeight) && savedHeight > 0) {
+    requestAnimationFrame(() => setLinkedBottomPanelHeight(savedHeight));
+  }
+
+  let resizeStartY = 0;
+  let resizeStartHeight = 0;
+  let isResizingOutput = false;
+
+  outputResizeHandle.addEventListener('pointerdown', (event) => {
+    if (!isDesktopPanelLayout()) return;
+    event.preventDefault();
+    isResizingOutput = true;
+    resizeStartY = event.clientY;
+    resizeStartHeight = outputPanel.getBoundingClientRect().height;
+    outputResizeHandle.setPointerCapture(event.pointerId);
+  });
+
+  outputResizeHandle.addEventListener('pointermove', (event) => {
+    if (!isResizingOutput) return;
+    setLinkedBottomPanelHeight(resizeStartHeight + resizeStartY - event.clientY);
+  });
+
+  function finishOutputResize(event) {
+    if (!isResizingOutput) return;
+    isResizingOutput = false;
+    if (outputResizeHandle.hasPointerCapture(event.pointerId)) {
+      outputResizeHandle.releasePointerCapture(event.pointerId);
+    }
+    setLinkedBottomPanelHeight(outputPanel.getBoundingClientRect().height, true);
+  }
+
+  outputResizeHandle.addEventListener('pointerup', finishOutputResize);
+  outputResizeHandle.addEventListener('pointercancel', finishOutputResize);
+  outputResizeHandle.addEventListener('dblclick', resetLinkedBottomPanelHeight);
+  outputResizeHandle.addEventListener('keydown', (event) => {
+    if (!isDesktopPanelLayout()) return;
+    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+    event.preventDefault();
+    const step = event.shiftKey ? 32 : 12;
+    const direction = event.key === 'ArrowUp' ? 1 : -1;
+    setLinkedBottomPanelHeight(outputPanel.getBoundingClientRect().height + direction * step, true);
+  });
+
+  window.addEventListener('resize', () => {
+    if (outputPanel.style.height && isDesktopPanelLayout()) {
+      setLinkedBottomPanelHeight(outputPanel.getBoundingClientRect().height);
+    }
+  });
+}
+
+const video = document.getElementById('videoFeed');
         const canvas = document.getElementById('canvas');
         const baseURL = document.getElementById('baseURL');
         const asrURL = document.getElementById('asrURL');
@@ -1231,6 +2068,7 @@
         const inputStatus = document.getElementById('inputStatus');
         const recordButton = document.getElementById('recordButton');
         const sendButton = document.getElementById('sendButton');
+        const newConversationButton = document.getElementById('newConversationButton');
         const controllerURL = document.getElementById('controllerURL');
         const localModelName = document.getElementById('localModelName');
         const systemStatsURL = document.getElementById('systemStatsURL');
@@ -1278,6 +2116,9 @@
         let systemStatsTimer = null;
         let systemStatsAbortController = null;
         let modelIdDiscovered = false;
+        let memoryApiOrigin = '';
+        let conversationId = sessionStorage.getItem('gemma4ConversationId') || '';
+        const MEMORY_SESSION_KEY = 'gemma4ConversationId';
 
         // 对话 ASR：完整录音结束后统一识别，避免短片段损失上下文。
         let isRecordingForChat = false;
@@ -1304,6 +2145,7 @@
             controllerURL.value = `http://${host}:8001`;
             ttsURL.value = `http://${host}:9881`;
             systemStatsURL.value = useEdgeProxy ? `${edgeOrigin}/api/system/stats` : `http://${host}:8001/api/system/stats`;
+            memoryApiOrigin = useEdgeProxy ? edgeOrigin : `http://${host}:8001`;
             try {
                 const saved = JSON.parse(localStorage.getItem('localServiceConfig') || '{}');
                 [baseURL, asrURL, controllerURL, ttsURL, localModelName, systemStatsURL].forEach((input) => {
@@ -1317,6 +2159,68 @@
             console.log(`[Config] API host 自动设置为: ${host}`);
         })();
         // ================================================================
+
+        async function memoryRequest(path, options = {}) {
+            const response = await fetch(`${memoryApiOrigin}${path}`, options);
+            if (!response.ok) {
+                const error = await response.json().catch(() => ({}));
+                throw new Error(error.detail || `记忆服务错误：HTTP ${response.status}`);
+            }
+            return response.json();
+        }
+
+        async function createConversation(showStatus = false) {
+            const record = await memoryRequest('/api/memory/new', { method: 'POST' });
+            conversationId = record.conversation_id;
+            sessionStorage.setItem(MEMORY_SESSION_KEY, conversationId);
+            if (showStatus) inputStatus.textContent = '🧠 已创建新对话，不继承之前的记忆';
+            return record;
+        }
+
+        async function getConversationContext() {
+            if (!conversationId) await createConversation();
+            try {
+                return await memoryRequest(`/api/memory/context?conversation_id=${encodeURIComponent(conversationId)}`);
+            } catch (error) {
+                // 文件被手动清理时自动创建会话；其他异常不阻断模型对话。
+                if (String(error.message).includes('无效')) {
+                    await createConversation();
+                    return memoryRequest(`/api/memory/context?conversation_id=${encodeURIComponent(conversationId)}`);
+                }
+                console.warn('[Memory] 读取失败，本次不携带历史：', error.message);
+                return { messages: [] };
+            }
+        }
+
+        async function saveConversationTurn(user, assistant) {
+            if (!conversationId || !assistant?.trim()) return;
+            try {
+                const result = await memoryRequest('/api/memory/turn', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ conversation_id: conversationId, user, assistant }),
+                });
+                if (result.compressed) inputStatus.textContent = '🧠 旧对话已压缩，保留近期上下文与关键偏好';
+            } catch (error) {
+                console.warn('[Memory] 保存失败：', error.message);
+            }
+        }
+
+        newConversationButton.addEventListener('click', async () => {
+            if (!confirm('创建新对话？新对话不会携带当前对话的记忆。')) return;
+            newConversationButton.disabled = true;
+            try {
+                await createConversation(true);
+                instructionText.value = '';
+                responseText.value = '';
+                pendingImageDataUrl = null;
+                imageUpload.value = '';
+                imageUploadButton.textContent = '🖼️';
+            } catch (error) {
+                inputStatus.textContent = `❌ 新建对话失败：${error.message}`;
+            } finally {
+                newConversationButton.disabled = false;
+            }
+        });
 
         function toggleSettings() {
             settingsModal.classList.toggle('active');
@@ -1590,7 +2494,7 @@
             if (isProcessing) setTimeout(processingLoop, waitTime);
         }
 
-        async function sendChatCompletionRequest(instruction, imageBase64URL, onDelta = null) {
+        async function sendChatCompletionRequest(instruction, imageBase64URL, onDelta = null, memoryMessages = []) {
             abortController = new AbortController();
             try {
                 const content = [{ type: 'text', text: instruction }];
@@ -1604,7 +2508,7 @@
                     stream: true,
                     // Gemma 4 默认会输出 reasoning_content；显式关闭可保证普通对话返回正文。
                     chat_template_kwargs: { enable_thinking: thinkingMode.checked },
-                    messages: [{ role: 'user', content }]
+                    messages: [...memoryMessages, { role: 'user', content }]
                 };
                 const response = await fetch(`${baseURL.value.replace(/\/$/, '')}/v1/chat/completions`, {
                     method: 'POST',
@@ -1751,7 +2655,7 @@
                         inputStatus.textContent = `❌ ASR: ${error.message}`;
                     } finally {
                         button.disabled = false;
-                        button.textContent = '🎙️ 点击开始说话';
+                        button.textContent = '🎙️ 语音输入';
                         instructionText.placeholder = '输入文字或点击录音...';
                     }
                 };
@@ -1767,7 +2671,7 @@
 
         // 绑定事件 (点击触发)
         const oldBtn = document.getElementById('recordButton');
-        oldBtn.innerText = "🎙️ 点击开始说话";
+        oldBtn.innerText = "🎙️ 语音输入";
 
         const newBtn = oldBtn.cloneNode(true);
         oldBtn.parentNode.replaceChild(newBtn, oldBtn);
@@ -1977,13 +2881,18 @@
                 } catch (controllerError) {
                     console.warn('[Chat] 控制器不可用，直连本地模型:', controllerError.message);
                     responseText.value = `[${time}] ✅ 本地模型（流式输出）\nQ: ${userText}\nA: `;
+                    const memoryContext = await getConversationContext();
                     let receivedText = false;
                     const directText = await sendChatCompletionRequest(userText, imageBase64, (delta) => {
                         receivedText = true;
                         responseText.value += delta;
                         responseText.scrollTop = responseText.scrollHeight;
-                    });
+                    }, memoryContext.messages);
                     if (!receivedText) responseText.value += directText;
+                    // 思考过程只用于当前展示；记忆仅保存最终回答，避免无关推理文本占用上下文。
+                    const memoryAnswer = thinkingMode.checked && directText.includes('\n\n最终回答：\n')
+                        ? directText.split('\n\n最终回答：\n').pop() : directText;
+                    await saveConversationTurn(userText, memoryAnswer);
                     if (directText) await playTTS(directText);
                 }
                 responseText.scrollTop = responseText.scrollHeight;
@@ -2393,8 +3302,87 @@
             if (systemStatsAbortController) systemStatsAbortController.abort();
             if (abortController) abortController.abort();
             stream?.getTracks().forEach(track => track.stop());
+            window.liquidGlassInstance?.destroy();
         });
 
+    </script>
+    <!-- 固定版本：真实 WebGL 液态玻璃。网络或 WebGL 不可用时，页面自动保留 CSS 降级效果。 -->
+    <script type="module">
+        import { LiquidGlass } from 'https://cdn.jsdelivr.net/npm/@ybouane/liquidglass@1.0.3/dist/index.js';
+
+        const glassRoot = document.querySelector('.viewport');
+        // 不依赖 :scope 选择器，确保 Firefox 也能准确获取 viewport 的直属面板。
+        const primaryGlassPanels = Array.from(glassRoot.children).filter(
+            (element) => element instanceof HTMLElement && element.classList.contains('floating-panel')
+        );
+
+        /*
+         * 真实玻璃预设：修改这里的数值即可微调效果，所有数值会自动同步至主面板。
+         * 0~1 型参数通常以小步长（0.01~0.05）调整；圆角/阴影参数使用像素单位。
+         */
+        const LIQUID_GLASS_CONFIG = {
+            blurAmount: 0.05,         // 背景模糊：0 清晰，1 最强
+            refraction: 0.37,         // 折射弯曲程度
+            chromAberration: 0.008,   // 边缘 RGB 色散
+            edgeHighlight: 0.36,      // 轮廓高光
+            specular: 0.04,           // 镜面高光
+            fresnel: 0.48,            // 侧视角反射强度
+            distortion: 0.006,        // 细微液态扰动
+            // 必须与 .floating-panel 的 border-radius: 24px 保持一致，避免玻璃画布出现第二层圆角。
+            cornerRadius: 24,         // 圆角（px）
+            zRadius: 6,               // 边缘弯曲/厚度（px）；较小值避免双层弧线
+            opacity: 0.76,            // 玻璃不透明度；越低越能看到背景
+            saturation: 0.03,         // 饱和度增减：-1 到 1
+            tintStrength: 0.02,       // 冷蓝色玻璃色调
+            brightness: 0.01,         // 明度：-0.5 到 0.5
+            shadowOpacity: 0.00,      // 外投影由 CSS 统一绘制，避免画布额外边缘
+            shadowSpread: 0,          // 投影扩散（px）
+            shadowOffsetY: 0,         // 投影纵向偏移（px）
+            floating: false,          // 禁用库内拖动，保留本项目原有定位和输出框高度调节
+        };
+
+        primaryGlassPanels.forEach((panel) => {
+            panel.dataset.config = JSON.stringify(LIQUID_GLASS_CONFIG);
+        });
+
+        try {
+            if (!primaryGlassPanels.length) {
+                throw new Error('未找到可应用 LiquidGlass 的直属面板');
+            }
+            const liquidGlassInstance = await LiquidGlass.init({
+                root: glassRoot,
+                glassElements: primaryGlassPanels,
+                defaults: LIQUID_GLASS_CONFIG,
+            });
+            const hasInjectedCanvases = primaryGlassPanels.every(
+                (panel) => Array.from(panel.children).some((child) => child.tagName === 'CANVAS')
+            );
+            if (!hasInjectedCanvases) {
+                liquidGlassInstance.destroy();
+                throw new Error('LiquidGlass 未向所有面板注入 WebGL 画布');
+            }
+            window.liquidGlassInstance = liquidGlassInstance;
+            glassRoot.classList.add('webgl-glass-ready');
+            // 可在浏览器开发者工具中实时执行：
+            // updateLiquidGlassConfig({ opacity: 0.4, refraction: 0.55 })
+            // 库会观察 data-config 变化；markChanged 用于立即请求一次重绘。
+            window.updateLiquidGlassConfig = (patch) => {
+                Object.assign(LIQUID_GLASS_CONFIG, patch);
+                primaryGlassPanels.forEach((panel) => {
+                    panel.dataset.config = JSON.stringify(LIQUID_GLASS_CONFIG);
+                });
+                liquidGlassInstance.markChanged();
+                return { ...LIQUID_GLASS_CONFIG };
+            };
+
+            // 相机显示/隐藏是 CSS 类变化，显式标记可避免动态视频切换后保留旧画面。
+            const liveVideo = document.getElementById('videoFeed');
+            new MutationObserver(() => liquidGlassInstance.markChanged(liveVideo))
+                .observe(liveVideo, { attributes: true, attributeFilter: ['class', 'style'] });
+            console.info(`[LiquidGlass] 已启用真实 WebGL 折射，当前 ${liquidGlassInstance.fps} FPS`);
+        } catch (error) {
+            console.warn('[LiquidGlass] 初始化失败，继续使用 CSS 玻璃降级效果：', error);
+        }
     </script>
 </body>
 
