@@ -1,7 +1,9 @@
 # Jetson Orin NX 上的 Gemma 4 E4B（中文操作手册）
 
 本项目在 JetPack 6.2.1 / CUDA 12.6 的 Jetson Orin NX 16GB 上运行 Gemma 4 E4B。
-运行时为本地构建的 `llama.cpp` CUDA 镜像，主模型为 Q4_0 GGUF；默认仅绑定本机回环地址。
+运行时为本地构建的 `llama.cpp` CUDA 镜像，主模型为 Q4_0 GGUF。
+示例配置默认仅绑定本机回环地址；本机当前 `config.env` 设置为 `HOST=0.0.0.0`，允许局域网访问。
+正式启动脚本已默认添加 `--ui-mcp-proxy`，用于原生网页连接 Home Assistant MCP。
 
 ## 当前组件与存放位置
 
@@ -19,7 +21,7 @@
 仅在本地镜像不存在或修改 `docker/llama-cpp-gemma4-cuda126.Dockerfile` 后执行：
 
 ```bash
-cd /home/nvidia/Desktop/gemma4_E4B
+cd /home/nvidia/Desktop/gemma4_E4B_for_VLA
 ./scripts/build-llama-image.sh
 ```
 
@@ -32,9 +34,22 @@ Successfully tagged gemma4-llama-cuda126:d7a2074
 ## 启动模型
 
 ```bash
-cd /home/nvidia/Desktop/gemma4_E4B
+cd /home/nvidia/Desktop/gemma4_E4B_for_VLA
 ./scripts/start-llama.sh
 ```
+
+该脚本会删除并重新创建同名容器，但保留挂载在项目目录中的模型文件。
+首次启动、修改配置或增加启动参数时使用它；未修改配置的日常启动使用 `sudo docker start gemma4-llama`。
+不要同时运行正式容器与临时测试容器。
+
+如果目前运行的是本次 MCP 测试创建的 `gemma4-llama-mcp-test`，先切换回正式容器：
+
+```bash
+sudo docker stop gemma4-llama-mcp-test
+bash /home/nvidia/Desktop/gemma4_E4B_for_VLA/scripts/start-llama.sh
+```
+
+仅在临时容器存在时执行上面的停止命令。脚本内部会请求 sudo 权限，无需使用 `sudo bash`。
 
 容器创建后查看模型加载过程：
 
@@ -42,7 +57,14 @@ cd /home/nvidia/Desktop/gemma4_E4B
 sudo docker logs -f gemma4-llama
 ```
 
-当日志出现 `server is listening`、`HTTP server listening` 或类似的监听信息时，服务可用。
+启动日志可用于观察加载过程，按 `Ctrl+C` 只退出日志查看，不停止容器。
+通过健康接口确认模型已加载完成：
+
+```bash
+curl --fail http://127.0.0.1:8080/health
+```
+
+返回 HTTP 200 表示就绪；加载期间可能返回 503。
 
 ## 网页与接口
 
@@ -74,14 +96,15 @@ curl http://127.0.0.1:8080/v1/chat/completions \
 
 ## 可调整参数
 
-编辑 `config.env` 后重启模型生效。
+编辑 `config.env` 后，重新执行 `scripts/start-llama.sh` 创建容器才会生效。
+`docker restart` 或 `docker stop` 后再 `docker start` 不会应用新增的环境变量和启动参数。
 
 | 参数 | 默认值 | 作用与建议 |
 | --- | ---: | --- |
-| `HOST` | `127.0.0.1` | 服务监听地址。保持默认只允许本机访问；不要直接改为 `0.0.0.0`，除非已配置认证和防火墙。 |
+| `HOST` | `127.0.0.1` | 示例默认仅本机访问；本机当前为 `0.0.0.0`。需要局域网直连时使用 Jetson 的局域网 IP，并限制访问范围。 |
 | `LLAMA_PORT` | `8080` | 网页与 API 端口。 |
 | `LLAMA_MODEL_FILE` | Q4_0 主模型 | 主模型文件名。16GB Orin 建议保持 Q4_0。 |
-| `LLAMA_VISION_FILE` | Q8_0 mmproj | 图片理解所需视觉投影文件。设为空可禁用图片、减少约 560MB 磁盘占用。 |
+| `LLAMA_VISION_FILE` | Q8_0 mmproj | 图片理解所需视觉投影文件。设为空会停止加载该文件，但不会删除磁盘上的文件。 |
 | `LLAMA_CTX_SIZE` | `4096` | 上下文长度。增大可保留更长对话，但会增加统一内存占用并降低可用余量；16GB 建议 2048–4096。 |
 | `LLAMA_PARALLEL` | `1` | 同时处理的会话槽位。内存有限时保持 1。 |
 | `LLAMA_GPU_LAYERS` | `99` | 尽可能将层放到 GPU。Orin 上保持 99。 |
@@ -95,7 +118,7 @@ curl http://127.0.0.1:8080/v1/chat/completions \
 停止模型（不删除模型文件或镜像）：
 
 ```bash
-./scripts/stop-vllm.sh
+sudo docker stop gemma4-llama
 ```
 
 查看容器状态：
@@ -104,12 +127,80 @@ curl http://127.0.0.1:8080/v1/chat/completions \
 sudo docker ps --filter name=gemma4-llama
 ```
 
-修改 `config.env` 后重启：
+不修改配置，启动已存在的容器：
 
 ```bash
-./scripts/stop-vllm.sh
-./scripts/start-llama.sh
+sudo docker start gemma4-llama
 ```
+
+修改 `config.env` 或启动参数后，重新创建：
+
+```bash
+bash /home/nvidia/Desktop/gemma4_E4B_for_VLA/scripts/start-llama.sh
+```
+
+正式容器使用 `--restart unless-stopped`：Docker 随系统启动时会恢复非手动停止的容器；
+手动停止后需执行 `docker start`。旧的 `scripts/stop-vllm.sh` 会同时尝试停止 vLLM 和 llama.cpp，
+这里只管理 Gemma llama.cpp 时使用上面的明确容器命令。
+
+## Home Assistant MCP：原生网页聊天控制灯
+
+连接链路为：`8080 原生聊天网页 → llama-server MCP 代理 → HA MCP Server → 灯`。
+这是 HA 的 MCP Server 接入，与 HA 内部调用模型的 llama.cpp 集成是两个独立入口。
+
+### HA 设置
+
+1. 在“设置 → 设备与服务 → 添加集成”中添加 **Model Context Protocol Server**。
+2. 打开其配置，关闭 **Expose all LLM APIs**，勾选 **Assist**。
+3. 保持 **Require an administrator account** 开启时，使用管理员账号创建访问令牌。
+4. 在“设置 → 语音助手 → 暴露”中，只将允许访问的灯、脚本等实体开放给 Assist。
+5. 在个人资料的“安全 → 长期访问令牌”中创建令牌，保存在客户端认证设置中，不放入提示词、仓库或截图。
+
+### 模型原生网页设置
+
+打开 `http://127.0.0.1:8080`，进入 **MCP Servers → Add New Server**：
+
+| 字段 | 内容 |
+| --- | --- |
+| Server URL | `http://<HA局域网IP>:8123/api/mcp`；如果 HA 提供可复制的 MCP 地址，优先使用它。 |
+| Display name | `HA` |
+| Authorization | 打开，选择 Bearer，将完整 HA 令牌填入令牌框；若界面已有 Bearer 前缀，不要重复输入。 |
+| Use llama-server proxy | 打开。正式启动脚本已包含 `--ui-mcp-proxy`。 |
+
+如果使用 Custom Headers 而不是内置 Authorization，键为 `Authorization`，值为
+`Bearer <HA令牌>`（Bearer 后有一个空格）。两种认证方式选一种，不要重复配置同名请求头。
+点击 Update，看到 Connected 和可用工具列表后，新建对话测试。
+
+先询问灯的状态，再请求打开它，并核对工具调用记录和实际灯光状态。
+若“卧室灯”无法匹配，可先用实体的实际名称（例如 `room1_rgb`）测试，再在 HA 设置中文显示名称、别名和所属区域。
+连接成功或模型回复“已打开”本身不代表操作成功，应查看工具返回结果。
+
+### 常见错误
+
+| 现象 | 检查事项 |
+| --- | --- |
+| `NetworkError` / `Failed to fetch` | 确认代理开关已打开、HA 地址可达；浏览器能打开 HA 登录页不能证明容器能访问 HA。 |
+| 代理开关灰色 | 检查正在运行的容器是否包含代理参数，再强制刷新网页。 |
+| `401` | 检查令牌及 Bearer 格式。 |
+| `403` | 检查账号权限及 HA 的管理员要求。 |
+| `404` | 检查 MCP Server 集成和地址。 |
+| 找不到灯 | 检查 Assist 暴露设置、实体名称、别名、区域及调用参数。 |
+
+检查启动参数：
+
+```bash
+sudo docker inspect gemma4-llama --format '{{json .Config.Cmd}}'
+```
+
+输出应包含 `--ui-mcp-proxy`。它属于模型启动参数，不能加到 `docker logs` 后面。
+本功能是实验性的网络代理，应仅供可信客户端使用。
+
+网页中的 MCP 设置不会自动赋予直接调用 `/v1/chat/completions` 的 ESP32 或其他客户端工具执行能力。
+硬件后端需要实现 MCP 客户端和工具调用循环，或接入已经支持它们的后端。
+当前 8001/8443 自定义 UI 仅代理模型对话等已有接口，未实现与原生网页相同的 MCP 工具调用逻辑。
+
+参考：[HA 官方 MCP 文档](https://www.home-assistant.io/integrations/mcp_server/)、
+[llama.cpp MCP 文档](https://github.com/ggml-org/llama.cpp/tree/master/tools/server#mcp-servers)。
 
 ## 局域网 UI、按需监控与模型代理（8001）
 
@@ -126,8 +217,9 @@ sudo docker ps --filter name=gemma4-llama
 | `/health`、`/v1/models`、`/v1/chat/completions` | 仅转发到本机 `127.0.0.1:8080` 的 llama.cpp 模型；回答的 SSE 数据会逐块透传。 |
 | `/api/monitor/health` | 监控服务自身的健康检查。 |
 
-UI 从 8001 打开时会自动将模型地址改为同源 8001，由后端代理到仅本机监听的
-8080。因此模型端口无需暴露到局域网。状态栏每 3 秒请求一次；最后一次 UI 请求后
+UI 从 8001 打开时会自动将模型地址改为同源 8001，由后端代理到本机
+8080。仅使用该代理时，模型端口无需暴露到局域网；当前 `HOST=0.0.0.0` 仍会直接开放模型监听。
+状态栏每 3 秒请求一次；最后一次 UI 请求后
 90 秒，监控 Python 进程与 `tegrastats` 自动退出。下次请求仍由 socket 自动唤醒。
 
 Jetson 使用统一内存，无法准确提供独立 VRAM；状态栏对应位置改为 GPU / CPU 温度，
@@ -143,6 +235,10 @@ sudo journalctl -u gemma4-system-monitor.service -n 100 --no-pager
 
 若后续加入灯光、相机或动作控制，请扩展该 8001 边缘服务，不要另起服务占用 8001。
 8001 当前没有认证，仅应开放在可信局域网；不可信网络应配置防火墙或增加认证。
+
+仓库中的 systemd 服务模板仍有 `/home/nvidia/Desktop/gemma4_E4B` 旧路径。
+在本目录重新安装这些服务前，需先将模板中的 WorkingDirectory、ExecStart 等路径调整为
+`/home/nvidia/Desktop/gemma4_E4B_for_VLA`，并检查依赖路径。不要直接覆盖已经正确运行的系统服务。
 
 ## 语音输入（Whisper ASR）
 
@@ -192,9 +288,7 @@ sudo journalctl -u gemma4-asr.service -n 100 --no-pager
 不要同时运行 vLLM、其他大型模型或多个 E4B 容器。需要重新尝试加载时：
 
 ```bash
-./scripts/stop-vllm.sh
-sudo sysctl -w vm.drop_caches=3
-./scripts/start-llama.sh
+sudo docker restart gemma4-llama
 ```
 
 监控功耗、温度和统一内存：
@@ -212,3 +306,6 @@ sudo docker logs --tail 200 gemma4-llama
 ## 多模态说明
 
 E4B 支持文字、图片与音频输入。当前部署会加载视觉 `mmproj`，因此网页可上传图片。`llama-server` 已在启动日志中初始化音频输入，但该能力仍标记为实验性，质量与接口兼容性需要在接入麦克风前单独验证；GGUF 仓库没有额外需要下载的独立 E4B 音频文件。实际语音交互建议仍以本地语音识别（ASR）将语音转文字，再发送给当前 E4B 服务，稳定性更好。
+
+标准 Gemma 4 E4B-it 原生生成文字；理解图片、音频不等于生成图片或声音。
+语音播放需要文字转语音（TTS），图片生成需要相应生成服务。MCP 提供工具连接，不会自动增加这些输出能力。

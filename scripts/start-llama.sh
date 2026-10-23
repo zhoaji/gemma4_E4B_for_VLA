@@ -59,4 +59,5 @@ exec sudo docker run --detach --name "$container_name" --restart unless-stopped 
     --port "$LLAMA_PORT" \
     --ctx-size "$LLAMA_CTX_SIZE" \
     --parallel "$LLAMA_PARALLEL" \
-    --gpu-layers "$LLAMA_GPU_LAYERS"
+    --gpu-layers "$LLAMA_GPU_LAYERS" \
+    --ui-mcp-proxy
