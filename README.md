@@ -242,42 +242,16 @@ sudo journalctl -u gemma4-system-monitor.service -n 100 --no-pager
 
 ## 语音输入（Whisper ASR）
 
-UI 的“点击开始说话”会录制完整语音，停止后转换为 16 kHz WAV 并上传；完整上下文可避免
-短片段造成的漏字、重复和语义误判，识别文本会在完成后填入文字输入框。8001/8443 将请求
-代理到仅本机监听的 8000 ASR 服务。
+ASR 已增加面向 ESP32-S3 等设备的 WebSocket PCM 流式入口，并保留现有网页的整段 WAV 上传。
+手表与本地应用共用单个常驻 Whisper base；按配对密钥区分来源，通过带优先级的有界队列串行推理，
+取消或重连不会把旧结果发送给其他请求。识别只返回文字，原有 Home Assistant 链路继续控制设备。
 
-默认使用已下载的多语言 Whisper `base`，以完整音频提高普通话与中英混说的准确率；语言由
-模型自动检测，不会把英文强制识别成中文。安装 OpenCC 时，结果通过 `tw2sp` 词典统一转换为大陆简体中文。
-当前已构建并验证 whisper.cpp CPU 后端；完整 CUDA 程序存在时优先使用 CUDA。
-独立的 Python CPU 回退需要另外安装 `openai-whisper` 及依赖，目前不依赖该路径。
-180 秒没有 ASR 请求即关闭服务并释放占用。模型与 CUDA 服务可通过 `scripts/install-asr.sh` 重建。
-已补齐模型和程序时，使用以下命令安装用户级按需服务，无需 sudo：
+本机默认监听 127.0.0.1:8000；局域网手表使用带证书与网段白名单的第二个 WSS 监听，仍共用一份模型。
+默认要求 CUDA，CPU 验证必须明确选择，不再静默回退或空闲 180 秒退出。
 
-```bash
-bash /home/nvidia/Desktop/gemma4_E4B_for_VLA/scripts/install-asr-user.sh
-```
-
-远程浏览器的麦克风必须使用安全上下文。局域网语音输入请访问：
-
-```text
-https://<Jetson-IP>:8443/
-```
-
-8443 使用项目生成的自签名证书，首次访问需在浏览器中确认信任；HTTP 8001 仍可用于
-状态查看和文字/图片对话，但多数浏览器会拒绝其麦克风权限。证书创建脚本为
-`scripts/create-ui-certificate.sh`，ASR 安装脚本为 `scripts/install-asr.sh`。
-
-排障：
-
-```bash
-systemctl --user status gemma4-asr.socket gemma4-asr.service
-curl --fail http://127.0.0.1:8000/health
-curl -k https://127.0.0.1:8443/api/monitor/health
-journalctl --user -u gemma4-asr.service -n 100 --no-pager
-```
-
-用户级 socket 仅监听 `127.0.0.1:8000`，不能直接作为 NAS 上 HA 的 Wyoming 服务使用。
-音频接口测试见 `app/brain/asr/README.md`。系统级与用户级 ASR 服务不要同时占用 8000 端口。
+完整实现方案、安装、配对、ESP32 音频格式、优先级、协议和测试见
+[ASR README](app/brain/asr/README.md)。浏览器本机录音测试使用 http://127.0.0.1:8000/；
+其他电脑可经 SSH 将本机 18000 转发到 Jetson 8000，再打开 http://localhost:18000/。
 
 ## 会话记忆
 

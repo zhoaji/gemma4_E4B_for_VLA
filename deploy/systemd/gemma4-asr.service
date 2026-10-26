@@ -1,5 +1,5 @@
 [Unit]
-Description=Gemma4 on-demand CUDA Whisper ASR
+Description=Gemma4 persistent shared CUDA Whisper ASR
 Requires=gemma4-asr.socket
 After=gemma4-asr.socket
 
@@ -9,10 +9,14 @@ User=nvidia
 Group=nvidia
 WorkingDirectory=/home/nvidia/Desktop/gemma4_E4B_for_VLA
 Environment=ASR_LANGUAGE=auto
-Environment=ASR_FALLBACK_MODEL=base
-ExecStart=/home/nvidia/anaconda3/bin/python3 /home/nvidia/Desktop/gemma4_E4B_for_VLA/app/brain/asr/server.py --socket-activation --idle-seconds 180
-Restart=no
+Environment=ASR_BACKEND=cuda
+ExecStart=/home/nvidia/anaconda3/bin/python3 /home/nvidia/Desktop/gemma4_E4B_for_VLA/app/brain/asr/server.py --socket-activation
+Restart=on-failure
+RestartSec=5
 TimeoutStopSec=15
 NoNewPrivileges=yes
 PrivateTmp=yes
 ProtectSystem=full
+
+[Install]
+WantedBy=multi-user.target
