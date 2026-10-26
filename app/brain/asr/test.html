@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>语音转文字测试</title>
+<style>
+body{font:17px/1.7 system-ui,sans-serif;background:#f4f6f8;color:#172332;margin:0;padding:32px 20px}
+main{max-width:680px;margin:auto;background:white;border-radius:20px;padding:28px}
+h1{font-size:26px;margin-top:0}button{font:inherit;padding:12px 22px;border:0;border-radius:10px;background:#145dc4;color:white;cursor:pointer}button:disabled{opacity:.5;cursor:wait}
+textarea{box-sizing:border-box;width:100%;min-height:180px;padding:14px;font:inherit;border:1px solid #ccd3dc;border-radius:10px}#status{min-height:30px}small{color:#536274}
+</style>
+<main>
+<h1>语音转文字测试</h1>
+<p>点击开始，说一句中文，再点击停止。录音会发送给 Jetson 上的 Whisper，识别结果显示在下方。</p>
+<button id="record">开始录音</button>
+<p id="status" role="status" aria-live="polite">等待录音。</p>
+<textarea id="result" readonly aria-label="识别结果" placeholder="识别文字会出现在这里"></textarea>
+<p><small>此页面只测试语音识别，不会自动把文字发送给 Gemma 或操作家庭设备。</small></p>
+</main>
+<script>
+const button=document.getElementById('record');
+const status=document.getElementById('status');
+const result=document.getElementById('result');
+let recorder=null,stream=null,chunks=[];
+
+async function wav16k(blob){
+  const context=new AudioContext();
+  let audio;
+  try{audio=await context.decodeAudioData(await blob.arrayBuffer());}
+  finally{await context.close();}
+  const offline=new OfflineAudioContext(1,Math.ceil(audio.duration*16000),16000);
+  const source=offline.createBufferSource();source.buffer=audio;
+  source.connect(offline.destination);source.start();
+  const samples=(await offline.startRendering()).getChannelData(0);
+  const bytes=new ArrayBuffer(44+samples.length*2),view=new DataView(bytes);
+  const label=(offset,text)=>{for(let i=0;i<text.length;i++)view.setUint8(offset+i,text.charCodeAt(i));};
+  label(0,'RIFF');view.setUint32(4,36+samples.length*2,true);label(8,'WAVE');
+  label(12,'fmt ');view.setUint32(16,16,true);view.setUint16(20,1,true);
+  view.setUint16(22,1,true);view.setUint32(24,16000,true);view.setUint32(28,32000,true);
+  view.setUint16(32,2,true);view.setUint16(34,16,true);label(36,'data');
+  view.setUint32(40,samples.length*2,true);
+  samples.forEach((sample,i)=>{const s=Math.max(-1,Math.min(1,sample));view.setInt16(44+i*2,s<0?s*32768:s*32767,true);});
+  return new Blob([bytes],{type:'audio/wav'});
+}
+
+button.onclick=async()=>{
+  if(recorder&&recorder.state==='recording'){
+    button.disabled=true;status.textContent='正在识别，请稍候……';recorder.stop();return;
+  }
+  button.disabled=true;
+  try{
+    if(!window.isSecureContext||!navigator.mediaDevices?.getUserMedia)
+      throw new Error('请通过 http://localhost:18000 打开 SSH 隧道页面；局域网 HTTP 地址通常不能使用麦克风。');
+    stream=await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true,noiseSuppression:true}});
+    chunks=[];recorder=new MediaRecorder(stream);
+    recorder.ondataavailable=event=>{if(event.data.size)chunks.push(event.data);};
+    recorder.onerror=()=>{stream.getTracks().forEach(t=>t.stop());button.disabled=false;button.textContent='重新录音';status.textContent='录音设备发生错误，请重试。';};
+    recorder.onstop=async()=>{
+      stream.getTracks().forEach(t=>t.stop());
+      try{
+        const wav=await wav16k(new Blob(chunks,{type:recorder.mimeType}));
+        const form=new FormData();form.append('file',wav,'recording.wav');
+        const started=performance.now();
+        const response=await fetch('/api/asr',{method:'POST',body:form});
+        const data=await response.json();
+        if(!response.ok)throw new Error(data.detail||'识别请求失败');
+        result.value=data.text||'';
+        status.textContent=`识别完成，用时 ${((performance.now()-started)/1000).toFixed(1)} 秒。`;
+      }catch(error){status.textContent='识别失败：'+error.message;}
+      finally{button.disabled=false;button.textContent='开始录音';recorder=null;}
+    };
+    recorder.start();result.value='';button.textContent='停止并识别';
+    status.textContent='正在录音……建议先说 5～10 秒。';button.disabled=false;
+  }catch(error){
+    if(stream)stream.getTracks().forEach(t=>t.stop());
+    status.textContent='无法录音：'+error.message;button.disabled=false;button.textContent='开始录音';
+  }
+};
+</script>
+</html>

@@ -247,13 +247,14 @@ UI 的“点击开始说话”会录制完整语音，停止后转换为 16 kHz 
 代理到仅本机监听的 8000 ASR 服务。
 
 默认使用已下载的多语言 Whisper `base`，以完整音频提高普通话与中英混说的准确率；语言由
-模型自动检测，不会把英文强制识别成中文。结果通过 OpenCC `tw2sp` 词典统一转换为大陆简体中文。
-CUDA whisper.cpp 后端完成时会优先使用，尚未就绪时自动回退到 `base` CPU。180 秒没有 ASR
-请求即关闭服务并释放占用。模型与 CUDA 服务可通过 `scripts/install-asr.sh` 重建。
+模型自动检测，不会把英文强制识别成中文。安装 OpenCC 时，结果通过 `tw2sp` 词典统一转换为大陆简体中文。
+当前已构建并验证 whisper.cpp CPU 后端；完整 CUDA 程序存在时优先使用 CUDA。
+独立的 Python CPU 回退需要另外安装 `openai-whisper` 及依赖，目前不依赖该路径。
+180 秒没有 ASR 请求即关闭服务并释放占用。模型与 CUDA 服务可通过 `scripts/install-asr.sh` 重建。
+已补齐模型和程序时，使用以下命令安装用户级按需服务，无需 sudo：
 
 ```bash
-sudo systemctl daemon-reload
-sudo systemctl restart gemma4-asr.service
+bash /home/nvidia/Desktop/gemma4_E4B_for_VLA/scripts/install-asr-user.sh
 ```
 
 远程浏览器的麦克风必须使用安全上下文。局域网语音输入请访问：
@@ -269,10 +270,14 @@ https://<Jetson-IP>:8443/
 排障：
 
 ```bash
-sudo systemctl status gemma4-asr.socket gemma4-asr.service
+systemctl --user status gemma4-asr.socket gemma4-asr.service
+curl --fail http://127.0.0.1:8000/health
 curl -k https://127.0.0.1:8443/api/monitor/health
-sudo journalctl -u gemma4-asr.service -n 100 --no-pager
+journalctl --user -u gemma4-asr.service -n 100 --no-pager
 ```
+
+用户级 socket 仅监听 `127.0.0.1:8000`，不能直接作为 NAS 上 HA 的 Wyoming 服务使用。
+音频接口测试见 `app/brain/asr/README.md`。系统级与用户级 ASR 服务不要同时占用 8000 端口。
 
 ## 会话记忆
 

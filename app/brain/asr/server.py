@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""按需 CUDA Whisper ASR 网关：POST /api/asr，返回 {"text": "..."}。"""
+"""按需 Whisper ASR 网关：POST /api/asr，返回 {"text": "..."}。"""
 
 import argparse
 import cgi
@@ -20,7 +20,9 @@ from urllib.request import Request, urlopen
 
 PROJECT_DIR = Path(__file__).resolve().parents[3]
 TEMP_DIR = PROJECT_DIR / "data" / "asr" / "tmp"
-DEFAULT_BINARY = PROJECT_DIR / "third_party" / "whisper.cpp" / "build" / "bin" / "whisper-server"
+CUDA_BINARY = PROJECT_DIR / "third_party" / "whisper.cpp" / "build" / "bin" / "whisper-server"
+CPU_BINARY = PROJECT_DIR / "third_party" / "whisper.cpp" / "build-cpu" / "bin" / "whisper-server"
+DEFAULT_BINARY = CUDA_BINARY if CUDA_BINARY.is_file() else CPU_BINARY
 DEFAULT_MODEL = PROJECT_DIR / "data" / "asr" / "whispercpp" / "ggml-base.bin"
 FALLBACK_MODEL_DIR = PROJECT_DIR / "data" / "asr" / "models"
 MAX_AUDIO_BYTES = 25 * 1024 * 1024
@@ -49,22 +51,26 @@ class ASRRuntime:
             return False
         command = [
             str(self.binary), "--host", "127.0.0.1", "--port", str(self.worker_port),
-            "-m", str(self.model_path), "-t", "4", "-fa", "-sns", "-nt",
+            "-m", str(self.model_path), "-t", "4", "-sns", "-nt",
         ]
+        if self.binary.resolve() == CPU_BINARY.resolve():
+            command.extend(("--no-gpu", "--no-flash-attn"))
+        else:
+            command.append("--flash-attn")
         if self.language != "auto":
             command.extend(("-l", self.language))
         self.worker = subprocess.Popen(command)
         deadline = time.monotonic() + 45
         while time.monotonic() < deadline:
             if self.worker.poll() is not None:
-                raise RuntimeError("CUDA Whisper 服务启动失败，请查看 journalctl -u gemma4-asr.service")
+                raise RuntimeError("Whisper 子进程启动失败，请查看 ASR 服务日志")
             try:
                 with socket.create_connection(("127.0.0.1", self.worker_port), timeout=0.3):
                     return
             except OSError:
                 time.sleep(0.2)
         self.stop_worker()
-        raise RuntimeError("CUDA Whisper 服务启动超时")
+        raise RuntimeError("Whisper 子进程启动超时")
 
     def transcribe(self, audio_path):
         with self._lock:
@@ -147,8 +153,21 @@ class Handler(BaseHTTPRequestHandler):
         self._json(200, {})
 
     def do_GET(self):
+        if urlparse(self.path).path in ("/", "/asr-test"):
+            page = Path(__file__).with_name("test.html").read_bytes()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(page)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(page)
+            return
         if urlparse(self.path).path == "/health":
-            self._json(200, {"status": "ok", "backend": "whisper.cpp-cuda"})
+            self._json(200, {
+                "status": "ok", "backend": "whisper.cpp",
+                "binary_present": self.server.runtime.binary.is_file(),
+                "model_present": self.server.runtime.model_path.is_file(),
+            })
             return
         self._json(404, {"detail": "not found"})
 
