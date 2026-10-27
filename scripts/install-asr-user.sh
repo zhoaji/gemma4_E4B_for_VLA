@@ -19,7 +19,7 @@ if [[ ! -s "$project_dir/data/asr/whispercpp/ggml-base.bin" ]]; then
   exit 1
 fi
 [[ -x "$asr_python" ]] || { echo 'ASR Python 不存在。' >&2; exit 1; }
-PYTHONPATH="$project_dir/data/asr/python-deps" "$asr_python" -c 'import aiohttp, webrtcvad'
+PYTHONPATH="$project_dir/data/asr/python-deps" "$asr_python" -c 'import aiohttp, webrtcvad; from opencc import OpenCC; OpenCC("t2s")'
 mkdir -p "$unit_dir"
 cat > "$unit_dir/gemma4-asr.socket" <<'EOF'
 [Unit]

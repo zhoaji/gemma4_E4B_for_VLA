@@ -1,2 +1,3 @@
 aiohttp==3.13.5
 webrtcvad-wheels==2.0.14
+opencc-python-reimplemented==0.1.7

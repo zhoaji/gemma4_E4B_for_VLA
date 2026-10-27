@@ -2,7 +2,6 @@
 import asyncio
 import io
 import json
-import shutil
 from pathlib import Path
 import subprocess
 import wave
@@ -13,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[3]
 CUDA = ROOT / 'third_party/whisper.cpp/build/bin/whisper-server'
 CPU = ROOT / 'third_party/whisper.cpp/build-cpu/bin/whisper-server'
 MODEL = ROOT / 'data/asr/whispercpp/ggml-base.bin'
+DEFAULT_INITIAL_PROMPT = '以下是普通话和 English 的语音原文，中文使用简体，English words 保留英文。'
 
 
 def wav_bytes(pcm):
@@ -30,16 +30,31 @@ class WhisperEngine:
     def ready(self):
         return self.process is not None and self.process.returncode is None
 
-    def __init__(self, backend='cuda', binary=None, model=MODEL, port=8002, language='zh'):
+    def __init__(self, backend='cuda', binary=None, model=MODEL, port=8002, language='auto',
+                 initial_prompt=DEFAULT_INITIAL_PROMPT):
         self.backend = backend
         self.binary = Path(binary or (CUDA if backend == 'cuda' else CPU))
         self.model, self.port, self.language = Path(model), port, language
         self.process = None
         self.client = None
+        self.initial_prompt = initial_prompt
+        self.converter = None
+
+    def normalize_text(self, text):
+        if self.converter is None:
+            try:
+                from opencc import OpenCC
+            except ImportError as error:
+                raise RuntimeError('Simplified Chinese output requires the ASR requirements (OpenCC)') from error
+            self.converter = OpenCC('t2s')
+        # Converts Chinese script only; English, numbers and product names remain text.
+        return self.converter.convert(text.strip())
 
     async def start(self):
         if not self.binary.is_file() or not self.model.is_file():
             raise RuntimeError('Whisper executable/model missing; CUDA requires a completed CUDA build')
+        # Fail startup rather than silently return Traditional Chinese without OpenCC.
+        self.normalize_text('')
         # Never attach to an unrelated process that happens to own this port.
         import socket
         with socket.socket() as probe:
@@ -89,21 +104,17 @@ class WhisperEngine:
         form.add_field('file', wav_bytes(pcm), filename='audio.wav', content_type='audio/wav')
         form.add_field('response_format', 'json')
         form.add_field('temperature', '0')
+        # Set every request explicitly: no dependence on previous utterance/client.
+        form.add_field('language', self.language)
+        form.add_field('translate', 'false')
+        form.add_field('detect_language', 'false')
+        if self.initial_prompt:
+            form.add_field('prompt', self.initial_prompt)
         async with self.client.post(f'http://127.0.0.1:{self.port}/inference', data=form) as r:
             if r.status != 200:
                 raise RuntimeError('Whisper inference failed')
             result = json.loads(await r.read())
-            text = str(result.get('text', '')).strip()
-            if text and shutil.which('opencc'):
-                def simplify():
-                    try:
-                        return subprocess.run(['opencc', '-c', 'tw2sp.json'], input=text,
-                            text=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-                            timeout=3, check=True).stdout.strip() or text
-                    except (OSError, subprocess.SubprocessError):
-                        return text
-                return await asyncio.to_thread(simplify)
-            return text
+            return self.normalize_text(str(result.get('text', '')))
 
     async def close(self):
         if self.client:

@@ -250,7 +250,9 @@ ASR 已增加面向 ESP32-S3 等设备的 WebSocket PCM 流式入口，并保留
 默认要求 CUDA，CPU 验证必须明确选择，不再静默回退或空闲 180 秒退出。
 
 完整实现方案、安装、配对、ESP32 音频格式、优先级、协议和测试见
-[ASR README](app/brain/asr/README.md)。浏览器本机录音测试使用 http://127.0.0.1:8000/；
+[ASR README](app/brain/asr/README.md)，其中“手表接入与 WebSocket 协议 v1（固件设计输入）”是固件接入规范，
+包含当前 WSS 地址、认证、PCM 包、状态机、错误码、重连及验收清单；“CA 证书：生成、位置与手表配置”说明证书生成命令、
+`data/asr/tls/ca.crt` 的位置以及 ESP32 导入方式。浏览器本机录音测试使用 http://127.0.0.1:8000/；
 其他电脑可经 SSH 将本机 18000 转发到 Jetson 8000，再打开 http://localhost:18000/。
 
 ## 会话记忆

@@ -46,6 +46,48 @@ class PairingTests(unittest.TestCase):
             self.assertIsNone(credentials.identify(second))
 
 
+class TextOutputTests(unittest.TestCase):
+    def test_traditional_is_simplified_without_translating_english(self):
+        engine = WhisperEngine()
+        self.assertEqual(engine.normalize_text(' 請打開臥室燈，亮度調到30%。 '),
+                         '请打开卧室灯，亮度调到30%。')
+        self.assertEqual(engine.normalize_text('請打開 Wi-Fi 和 Bluetooth，使用 Home Assistant。'),
+                         '请打开 Wi-Fi 和 Bluetooth，使用 Home Assistant。')
+        self.assertEqual(engine.normalize_text('Good morning! Turn on the light.'),
+                         'Good morning! Turn on the light.')
+
+
+class InferenceContractTests(unittest.IsolatedAsyncioTestCase):
+    async def test_each_inference_explicitly_transcribes_and_normalizes(self):
+        import aiohttp
+        from aiohttp import web
+        requests = []
+
+        async def inference(request):
+            data = await request.post()
+            requests.append({key: value for key, value in data.items() if key != 'file'})
+            return web.json_response({'text': '請打開 Wi-Fi。' if len(requests) == 1 else 'Good morning!'})
+
+        app = web.Application()
+        app.router.add_post('/inference', inference)
+        server = TestServer(app)
+        await server.start_server()
+        engine = WhisperEngine(port=server.port)
+        engine.client = aiohttp.ClientSession()
+        try:
+            self.assertEqual(await engine.transcribe(QUIET), '请打开 Wi-Fi。')
+            self.assertEqual(await engine.transcribe(QUIET), 'Good morning!')
+            for fields in requests:
+                self.assertEqual(fields['language'], 'auto')
+                self.assertEqual(fields['translate'], 'false')
+                self.assertEqual(fields['detect_language'], 'false')
+                self.assertEqual(fields['temperature'], '0')
+                self.assertEqual(fields['prompt'], engine.initial_prompt)
+        finally:
+            await engine.close()
+            await server.close()
+
+
 class VAD:
     def is_speech(self, pcm, rate):
         return pcm != QUIET
@@ -305,6 +347,216 @@ class WireTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.status, 200)
         self.assertEqual((await response.json())['text'], '')
         self.assertEqual(self.engine.calls, [])
+
+    async def test_connection_and_silent_audio_are_observable_without_logging_content(self):
+        with self.assertLogs('asr.events', level='INFO') as logs:
+            ws, _ = await self.connect()
+            await self.start(ws)
+            await ws.send_bytes(struct.pack('<I', 0) + QUIET * 5)
+            await ws.send_json(dict(type='ping'))
+            self.assertEqual((await ws.receive_json())['phase'], 'pong')
+            response = await self.client.get('/metrics')
+            metrics = await response.json()
+            self.assertEqual(metrics['authenticated_connections'], 1)
+            self.assertEqual(metrics['received_audio_bytes'], 3200)
+            self.assertEqual(metrics['received_audio_packets'], 1)
+            client = metrics['active_clients'][0]
+            self.assertEqual(client['client_id'], 'watch1')
+            self.assertTrue(client['recording'])
+            self.assertEqual(client['audio_bytes'], 3200)
+            self.assertIsNotNone(client['last_audio_age_seconds'])
+            self.assertEqual(self.engine.calls, [])
+            await ws.close()
+        output = '\n'.join(logs.output)
+        self.assertIn('event=authenticated', output)
+        self.assertIn('event=audio_received', output)
+        self.assertNotIn('token=', output)
+        self.assertNotIn('text=', output)
+
+    async def test_documented_ready_control_fields_and_empty_recording_completion(self):
+        ws, ready = await self.connect()
+        self.assertEqual(set(ready), {'state', 'client_id', 'source', 'session_id',
+            'request_id', 'phase', 'protocol', 'format', 'sample_rate', 'channels'})
+        self.assertIsNone(ready['request_id'])
+        self.assertEqual((ready['protocol'], ready['format'], ready['sample_rate'], ready['channels']),
+                         (1, 'pcm_s16le', 16000, 1))
+        self.assertEqual(len(ready['session_id']), 32)
+        await ws.send_json(dict(type='start', request_id='spec-request',
+                                sample_rate=16000, channels=1, format='pcm_s16le'))
+        recording = await ws.receive_json()
+        self.assertEqual(recording['next_sequence'], 0)
+        self.assertEqual(recording['phase'], 'recording')
+        await ws.send_json(dict(type='stop'))
+        stopped = await ws.receive_json()
+        self.assertEqual(stopped['phase'], 'stopped')
+        self.assertEqual(len(stopped['discarded_utterance_id']), 32)
+        await ws.send_json(dict(type='ping'))
+        pong = await ws.receive_json()
+        self.assertEqual((pong['phase'], pong['request_id']), ('pong', 'spec-request'))
+        self.assertEqual(self.engine.calls, [])
+        await ws.close()
+
+    async def test_documented_fatal_validation_codes(self):
+        cases = [('{', False, 'invalid_json'),
+                 ('[]', False, 'invalid_message'),
+                 ('{"type":"start","request_id":"bad id"}', False, 'invalid_request_id'),
+                 ('{"type":"start","request_id":"ok","channels":2}', False, 'unsupported_audio_format'),
+                 ('{"type":"auth"}', False, 'unknown_command'),
+                 (struct.pack('<I', 0) + QUIET, False, 'start_required'),
+                 (struct.pack('<I', 0) + QUIET[:-1], True, 'invalid_audio_packet'),
+                 (struct.pack('<I', 0) + QUIET * 11, True, 'invalid_audio_packet'),
+                 (struct.pack('<I', 1) + QUIET, True, 'sequence_mismatch_restart_recording')]
+        for payload, started, expected in cases:
+            with self.subTest(code=expected):
+                ws, _ = await self.connect()
+                if started:
+                    await self.start(ws)
+                if isinstance(payload, bytes):
+                    await ws.send_bytes(payload)
+                else:
+                    await ws.send_str(payload)
+                error = await self.until(ws, 'error')
+                self.assertEqual(error['code'], expected)
+                self.assertEqual(error['client_id'], 'watch1')
+                from aiohttp import WSMsgType
+                self.assertEqual((await ws.receive()).type, WSMsgType.CLOSE)
+                await ws.close()
+                await asyncio.sleep(.01)
+
+    async def test_stop_keeps_pending_final_and_rejects_new_start_until_done(self):
+        self.engine.gate = asyncio.Event()
+        ws, _ = await self.connect()
+        await self.start(ws, 'old')
+        await self.send_voice(ws)
+        await ws.send_json(dict(type='stop'))
+        while (await ws.receive_json()).get('phase') != 'stopped':
+            pass
+        await ws.send_json(dict(type='start', request_id='premature'))
+        error = await self.until(ws, 'error')
+        self.assertEqual((error['code'], error['request_id']), ('request_in_progress', 'old'))
+        self.engine.gate.set()
+        final = await self.until(ws, 'final')
+        self.assertEqual(final['request_id'], 'old')
+        self.assertGreater(final['revision'], 0)
+        await ws.send_json(dict(type='stop'))
+        self.assertEqual((await self.until(ws, 'error'))['code'], 'not_recording')
+        await self.start(ws, 'new')
+        await ws.close()
+
+    async def test_documented_min_and_max_packet_sizes(self):
+        ws, _ = await self.connect()
+        await self.start(ws)
+        await ws.send_bytes(struct.pack('<I', 0) + QUIET)
+        await ws.send_bytes(struct.pack('<I', 1) + QUIET * 10)
+        await ws.send_json(dict(type='ping'))
+        self.assertEqual((await ws.receive_json())['phase'], 'pong')
+        metrics = await (await self.client.get('/metrics')).json()
+        self.assertEqual(metrics['received_audio_bytes'], 640 * 11)
+        self.assertEqual(metrics['received_audio_packets'], 2)
+        await ws.close()
+
+    async def debug_control(self, action):
+        state = await (await self.client.get('/test/api/state')).json()
+        response = await self.client.post('/test/api/control', json={'action': action},
+            headers={'X-ASR-Debug-Token': state['token']})
+        self.assertEqual(response.status, 200)
+
+    async def test_debug_opt_in_and_exact_audio_and_separate_devices(self):
+        import io
+        import wave
+        a, _ = await self.connect()
+        await self.start(a)
+        await self.send_voice(a)
+        await a.send_json({'type': 'stop'})
+        await self.until(a, 'final')
+        state = await (await self.client.get('/test/api/state')).json()
+        self.assertFalse(state['enabled'])
+        self.assertEqual(state['records'], [])
+        await self.debug_control('start')
+        b, _ = await self.connect('local1')
+        await self.start(a, 'same-request')
+        await self.start(b, 'same-request')
+        await self.send_voice(a, 1)
+        await self.send_voice(b, 2)
+        await a.send_json({'type': 'stop'})
+        await b.send_json({'type': 'stop'})
+        await asyncio.gather(self.until(a, 'final'), self.until(b, 'final'))
+        state = await (await self.client.get('/test/api/state')).json()
+        self.assertEqual(len(state['records']), 2)
+        for record in state['records']:
+            marker = 1 if record['client_id'] == 'watch1' else 2
+            prefix = '/test/api/records/' + record['id']
+            raw = await (await self.client.get(prefix + '/audio.pcm')).read()
+            self.assertEqual(raw, bytes([marker, 0]) * 320 * 20)
+            wav = await (await self.client.get(prefix + '/audio.wav')).read()
+            with wave.open(io.BytesIO(wav)) as audio:
+                self.assertEqual((audio.getframerate(), audio.getnchannels(), audio.getsampwidth()), (16000, 1, 2))
+                self.assertEqual(audio.readframes(audio.getnframes()), raw)
+            detail = await (await self.client.get(prefix)).json()
+            self.assertEqual(detail['results'][0]['text'], 'result-' + str(marker))
+        await self.debug_control('clear')
+        self.assertEqual((await self.client.get(prefix)).status, 404)
+        await a.close()
+        await b.close()
+
+    async def test_debug_security_and_fixed_assets(self):
+        self.assertEqual((await self.client.get('/test/')).status, 200)
+        self.assertEqual((await self.client.get('/test/app.js')).status, 200)
+        self.assertEqual((await self.client.get('/test/README.md')).status, 404)
+        self.assertEqual((await self.client.get('/test/api/state', headers={'Host': 'outside.example'})).status, 403)
+        self.assertEqual((await self.client.get('/test/api/state', headers={'Origin': 'http://evil.example'})).status, 403)
+        self.assertEqual((await self.client.post('/test/api/control', json={'action': 'start'})).status, 403)
+        self.assertFalse((await (await self.client.get('/test/api/state')).json())['enabled'])
+
+    async def test_debug_clear_during_inference_does_not_restore_text(self):
+        self.engine.gate = asyncio.Event()
+        await self.debug_control('start')
+        ws, _ = await self.connect()
+        await self.start(ws)
+        await self.send_voice(ws)
+        await ws.send_json({'type': 'stop'})
+        await self.debug_control('clear')
+        self.engine.gate.set()
+        await self.until(ws, 'final')
+        state = await (await self.client.get('/test/api/state')).json()
+        self.assertEqual(state['records'], [])
+        self.assertNotIn('result-1', json.dumps(state))
+        await ws.close()
+
+    async def test_debug_http_upload_and_pause(self):
+        await self.debug_control('start')
+        data = FormData()
+        data.add_field('file', wav_bytes(VOICE * 20), filename='test.wav', content_type='audio/wav')
+        response = await self.client.post('/api/asr', data=data, headers={'X-Request-ID': 'http-debug'})
+        self.assertEqual(response.status, 200)
+        state = await (await self.client.get('/test/api/state')).json()
+        self.assertEqual(state['records'][0]['transport'], 'http')
+        self.assertEqual(state['records'][0]['request_id'], 'http-debug')
+        await self.debug_control('pause')
+        self.assertFalse((await (await self.client.get('/test/api/state')).json())['enabled'])
+
+
+class DebugStoreTests(unittest.TestCase):
+    def test_memory_count_ttl_and_capture_expiration(self):
+        from app.brain.asr.debug import DebugStore
+        clock = [100.]
+        store = DebugStore(clock=lambda: clock[0])
+        client = {'id': 'watch', 'source': 'watch'}
+        self.assertIsNone(store.begin(client, 's', 'r'))
+        store.enabled_until = 700
+        store.MAX_BYTES = 1000
+        for _ in range(30):
+            key = store.begin(client, 's', 'r')
+            store.audio(key, bytes(100))
+        self.assertLessEqual(sum(len(r['pcm']) for r in store.records.values()), 1000)
+        self.assertLessEqual(len(store.records), store.MAX_RECORDS)
+        for _ in range(400):
+            store.event('connected')
+        self.assertEqual(len(store.events), 300)
+        clock[0] = 701
+        store.purge()
+        self.assertFalse(store.enabled)
+        self.assertEqual(store.records, {})
 
 
 if __name__ == '__main__':
