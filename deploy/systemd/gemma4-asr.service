@@ -7,10 +7,10 @@ After=gemma4-asr.socket
 Type=simple
 User=nvidia
 Group=nvidia
-WorkingDirectory=/home/nvidia/Desktop/gemma4_E4B_for_VLA
+WorkingDirectory=/home/nvidia/Desktop/gemma4_E4B
 Environment=ASR_LANGUAGE=auto
 Environment=ASR_BACKEND=cuda
-ExecStart=/home/nvidia/anaconda3/bin/python3 /home/nvidia/Desktop/gemma4_E4B_for_VLA/app/brain/asr/server.py --socket-activation
+ExecStart=/home/nvidia/anaconda3/bin/python3 /home/nvidia/Desktop/gemma4_E4B/app/brain/asr/server.py --socket-activation
 Restart=on-failure
 RestartSec=5
 TimeoutStopSec=15
