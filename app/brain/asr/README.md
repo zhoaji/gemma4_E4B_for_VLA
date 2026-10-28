@@ -23,6 +23,7 @@ ESP32-S3：I2S 麦克风 → PCM → WSS /ws/asr ─┐
 | segmentation.py | WebRTC VAD、开始/停止说话、前置缓存、分段 |
 | scheduler.py | 共享推理队列、优先级、取消、临时结果合并 |
 | engine.py | 启动一次 whisper.cpp、内存 WAV、健康检查、日志隐私 |
+| ../../../scripts/asr-model.sh | 常驻服务切换 base/turbo、失败恢复配置，也可显式前台启动 |
 | auth.py | 离线创建/轮换/撤销每个客户端的密钥 |
 | tls.py | 创建本地 CA 与带 IP/DNS SAN 的服务器证书 |
 | client.py | WAV 模拟手表实时发送 PCM，也是本地接入参考 |
@@ -31,7 +32,9 @@ ESP32-S3：I2S 麦克风 → PCM → WSS /ws/asr ─┐
 | debug.py | 默认关闭的有界内存音频/文字采集，仅本机访问 |
 | tests/test_asr.py | 协议、并发与生命周期测试 |
 
-模型为多语言 base：`data/asr/whispercpp/ggml-base.bin`。CLI 与安装脚本默认语言均为 `auto`。
+当前常驻服务选择 **多语言 whisper-large-v3-turbo 非量化版**：`data/asr/whispercpp/ggml-large-v3-turbo.bin`（GGML FP16 权重，约 1.5 GiB）。
+原 base 模型 `data/asr/whispercpp/ggml-base.bin` 保留，可随时切回。语言保持 `auto`。
+历史直接调用 `python3 app/brain/asr/server.py` 的默认模型仍为 base，以保持旧启动方式兼容；常驻服务通过 `ASR_MODEL_PATH` 明确选择 turbo，不依赖这个历史默认值。
 中文统一经必需依赖 `opencc-python-reimplemented` 的 `t2s` 转为简体，英文和数字保留原样；
 转换器在启动时加载一次，缺少依赖会启动失败，不再静默返回繁体。
 
@@ -46,6 +49,52 @@ Whisper 是整段识别器，临时文字通过重复识别当前句子实现，
 启动现有 ASR 后，本机打开 **http://127.0.0.1:8000/test/**。先点击“开启调试采集”，再让手表录音，即可查看在线设备、连接/协议错误、原始 PCM/WAV、波形及实际返回的临时/最终文字。手表、本地 HTTP 请求按设备、会话和请求隔离显示。
 
 默认不采集音频或正文；手动开启后只在内存临时保留，每次采集最长 10 分钟，每条记录保留最多 10 分钟，最多 20 条 / 16 MiB 音频。调试结束可“关闭并清空”。重启会丢失调试数据，不会自动保存到磁盘。详细边界、音频含义与远程电脑 SSH 转发方法见 **[test/README.md](test/README.md)**。
+
+## turbo 与 base 启动、回退
+
+以下命令在工程根目录执行。模型、TLS、客户端密钥分别保存，切换模型只重启 ASR，连接中的手表需要重连。
+
+```bash
+# 常驻服务：切换到非量化 turbo，成功后下一次重启仍使用它
+bash scripts/asr-model.sh turbo
+# 回退：使用保留的 base 模型及现有服务入口
+bash scripts/asr-model.sh base
+# 确认真正加载的模型，而不只看 service 是否 active
+curl --fail http://127.0.0.1:8000/health
+```
+
+切换脚本写入 `~/.config/systemd/user/gemma4-asr.service.d/40-asr-model.conf` 的 `ASR_MODEL_PATH`，不改变现有 `30-asr-lan.conf` 的 LAN/TLS 配置。脚本等待健康接口返回目标文件名，启动失败时恢复切换前的模型配置并尝试重启。若以前手工在 ExecStart 写了 `--model-path`，应先移除此显式参数，防止它覆盖环境变量。
+
+前台启动（仅供独立调试；需先停止占用相同端口的常驻 socket/service）：
+
+```bash
+systemctl --user stop gemma4-asr.socket gemma4-asr.service
+bash scripts/asr-model.sh turbo --foreground --backend cuda --language auto
+# 或历史 base：bash scripts/asr-model.sh base --foreground --backend cuda --language auto
+# 前台 Ctrl+C 退出后，恢复已选定模型的常驻服务：
+systemctl --user start gemma4-asr.socket gemma4-asr.service
+```
+
+前台方式不改变持久模型选择，默认仅本机入口；LAN/WSS 仍按后文参数配置。单个模型常驻、同一队列串行推理，勿同时启动两套同端口服务。切换模型不改变 16 kHz PCM、WSS 认证、partial/final 协议及简体转换。
+
+非量化模型来源为 whisper.cpp 官方转换仓库：
+`https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin`。
+下载到 `.part` 后校验再改名；当前固定 SHA1 为 `4af2b29d7ec73d781377bfd1758ca957a807e941`。不使用名称带 `q5_0` 或 `q8_0` 的文件。文件大小不是运行时内存占用；Gemma 与 ASR 共用 Jetson 内存。
+
+本次切换前的服务 unit、LAN drop-in、engine/server、安装脚本和 README 原件备份在 `data/asr/backups/before-turbo-20261028-215254/`。日常回退优先用 `asr-model.sh base`，无需恢复旧代码。
+
+### 本机部署验证（2026-10-28）
+
+Jetson Orin NX 16GB、MAXN、现有 CUDA whisper.cpp、非量化 turbo；Gemma Q4 / 16K 上下文保持加载，但本次没有同时向 Gemma 发起生成请求：
+
+- 模型完整文件 1,624,555,275 字节，通过上述官方 SHA1；文件头为 ftype=1（FP16）、32 层 encoder、4 层 decoder、128 mel。
+- `/health` 返回 `model=ggml-large-v3-turbo.bin`、`backend=cuda`、`language=auto`、`output_script=Hans`、`translate=false`。
+- 工程自带公开英文示例 `third_party/whisper.cpp/samples/jfk.wav`，时长 11 秒；HTTP 完整上传转写两次分别约 **4.64 / 4.68 秒**。此前 base 同机参考约 1.10 / 0.62 秒，不能把 turbo 名称理解为一定比 base 更快。
+- 同音频按实时速度经原 WSS / CA / 临时配对发送，成功收到 final；从开始发送至全部返回约 **17.38 秒**，final 的 `elapsed_ms` 为 **6278**（含排队，不含此前录音时间）。临时识别重复计算会影响最终返回延迟。
+- 采样时总 RAM 使用约 12.8GB / 15.7GB（tegrastats MB 显示），`free -h` 可用约 **2.6GiB**，GPU 工作采样约 93–99%；Gemma `/health` 返回 200。这不等于双模型同时生成或多手表并发压力测试已通过。
+- 临时测试配对已撤销，调试音频采集保持关闭。回归测试 28 项通过。
+
+以上为部署连通与耗时验证，不代表中文、中英混合及用户手表麦克风的识别准确率。可在调试台开启临时采集，对比自己的实录音频。
 
 ## 安装与启动
 
@@ -72,13 +121,16 @@ cmake --build third_party/whisper.cpp/build --target whisper-server -j2
 安装常驻用户服务（不需要 sudo）：
 
 ```bash
+# 默认选择非量化 turbo，需先下载该模型。
 ASR_BACKEND=cuda bash scripts/install-asr-user.sh
+# 若需要按旧模型安装：
+# ASR_MODEL_PATH="$PWD/data/asr/whispercpp/ggml-base.bin" ASR_BACKEND=cuda bash scripts/install-asr-user.sh
 # CUDA 尚未完成时，可明确选择 ASR_BACKEND=cpu。
 systemctl --user status gemma4-asr.socket gemma4-asr.service --no-pager
 curl --fail http://127.0.0.1:8000/health
 ```
 
-健康接口只在模型加载后返回 ready 和实际 backend；仍需音频请求验证转写质量。不要同时启用系统级和用户级同端口服务。开机免登录运行还需要用户管理器启用 linger。常驻模型占用内存，应与 Gemma 同时运行测资源余量。
+健康接口只在模型加载后返回 ready、实际 backend 与 model 文件名；仍需音频请求验证转写质量。不要同时启用系统级和用户级同端口服务。开机免登录运行还需要用户管理器启用 linger。常驻模型占用内存，应与 Gemma 同时运行测资源余量。
 
 ## 简体中文与中英混合识别
 

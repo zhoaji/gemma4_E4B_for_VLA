@@ -398,6 +398,7 @@ class Service:
         ready = getattr(self.engine, 'ready', True)
         return web.json_response(dict(status='ready' if ready else 'unavailable',
             backend=self.engine.backend, sample_rate=16000, protocol=1,
+            model=Path(self.engine.model).name if getattr(self.engine, 'model', None) else None,
             language=getattr(self.engine, 'language', None),
             output_script='Hans' if isinstance(self.engine, WhisperEngine) else None,
             translate=False), status=200 if ready else 503)

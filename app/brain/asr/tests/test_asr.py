@@ -193,6 +193,15 @@ class SchedulerTests(unittest.IsolatedAsyncioTestCase):
 
 
 class WireTests(unittest.IsolatedAsyncioTestCase):
+    async def test_health_exposes_actual_model_and_model_path_precedence(self):
+        from unittest.mock import patch
+        self.engine.model = Path('/models/ggml-large-v3-turbo.bin')
+        health = await (await self.client.get('/health')).json()
+        self.assertEqual(health['model'], 'ggml-large-v3-turbo.bin')
+        with patch.dict('os.environ', {'ASR_MODEL_PATH': '/models/turbo.bin'}):
+            self.assertEqual(parse_args([]).model_path, '/models/turbo.bin')
+            self.assertEqual(parse_args(['--model-path', '/models/base.bin']).model_path, '/models/base.bin')
+
     async def test_dead_backend_is_not_reported_ready(self):
         self.engine.ready = False
         response = await self.client.get('/health')
